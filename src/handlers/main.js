@@ -44,12 +44,19 @@ async function handleTypeChoice(ctx, userType) {
   db.updateUser(telegramId, { user_type: userType });
   setState(telegramId, { user_type: userType });
 
-  await ctx.editMessageText(
-    userType === 'personal'
-      ? '🔹 Отлично! Будем развивать твой личный бренд.\n\nКак тебя зовут? (напиши своё имя)'
-      : '🔸 Отлично! Будем привлекать партнёров для твоего бизнеса.\n\nКак тебя зовут? (напиши своё имя)'
-  );
-  setStep(telegramId, 'ask_name');
+  if (userType === 'personal') {
+    await ctx.editMessageText(
+      '🔹 Отлично! Будем развивать твой личный бренд.\n\nКак тебя зовут? (напиши своё имя)'
+    );
+    setStep(telegramId, 'ask_name');
+  } else {
+    // Бизнес — начинаем квалификацию
+    await ctx.editMessageText(
+      '🏢 Отлично! Пара быстрых вопросов чтобы я лучше понял твой бизнес.\n\n*Ваш бизнес оформлен юридически (ИП или ООО)?*',
+      { parse_mode: 'Markdown', ...kb.qualLegalKeyboard }
+    );
+    setStep(telegramId, 'qual_legal');
+  }
 }
 
 // ─── Сбор данных (текстовые ответы) ──────────────────────
@@ -158,6 +165,62 @@ async function handleCallback(ctx) {
   // Тип
   if (data === 'type_personal') return handleTypeChoice(ctx, 'personal');
   if (data === 'type_business') return handleTypeChoice(ctx, 'business');
+
+  // ─── Квалификация бизнеса ────────────────────────────────
+  if (data === 'qual_legal_yes') {
+    setState(telegramId, { qual_legal: 'yes' });
+    await ctx.editMessageText(
+      '✅ Отлично!\n\n*Клиенты покупают у вас повторно или платят по подписке?*',
+      { parse_mode: 'Markdown', ...kb.qualRepeatKeyboard }
+    );
+    setStep(telegramId, 'qual_repeat');
+    return;
+  }
+
+  if (data === 'qual_legal_no') {
+    // Нет юрлица — мягко переводим в личный бренд
+    db.updateUser(telegramId, { user_type: 'personal' });
+    setState(telegramId, { user_type: 'personal', qual_redirected: true });
+    await ctx.editMessageText(
+      '⏳ Понял! Пока бизнес оформляется — самое время прокачать личный бренд.\n\nПосты о твоей экспертизе привлекут первых клиентов ещё до официального запуска 💡\n\nКак тебя зовут?'
+    );
+    setStep(telegramId, 'ask_name');
+    return;
+  }
+
+  if (data === 'qual_repeat_yes' || data === 'qual_repeat_mid' || data === 'qual_repeat_no') {
+    setState(telegramId, { qual_repeat: data });
+    await ctx.editMessageText(
+      '📊 *Примерный оборот вашего бизнеса в месяц?*',
+      { parse_mode: 'Markdown', ...kb.qualRevenueKeyboard }
+    );
+    setStep(telegramId, 'qual_revenue');
+    return;
+  }
+
+  if (data.startsWith('qual_rev_')) {
+    const repeat = state.qual_repeat || '';
+    const legal = state.qual_legal || '';
+    const isStrong = data !== 'qual_rev_low' && repeat === 'qual_repeat_yes' && legal === 'yes';
+    const isMid = data === 'qual_rev_mid' || repeat === 'qual_repeat_mid';
+
+    if (isStrong || isMid) {
+      // Сильный бизнес — полная бизнес-ветка
+      setState(telegramId, { qual_revenue: data, user_type: 'business' });
+      await ctx.editMessageText(
+        '🚀 Отлично! У вас зрелый бизнес с потенциалом для партнёрской сети.\n\nЯ помогу создать посты которые привлекут сильных партнёров — владельцев своих каналов продаж.\n\nКак вас зовут?'
+      );
+    } else {
+      // Слабые показатели — переводим в личный бренд
+      db.updateUser(telegramId, { user_type: 'personal' });
+      setState(telegramId, { qual_revenue: data, user_type: 'personal', qual_redirected: true });
+      await ctx.editMessageText(
+        '💡 Понял! Сейчас самое важное — нарастить базу клиентов и укрепить позиции.\n\nДавай начнём с личного бренда — посты о твоей экспертизе помогут привлечь первых лояльных покупателей 🎯\n\nКак тебя зовут?'
+      );
+    }
+    setStep(telegramId, 'ask_name');
+    return;
+  }
 
   // Возраст
   if (data.startsWith('age_')) {
