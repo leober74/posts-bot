@@ -1,8 +1,26 @@
 const { Markup } = require('telegraf');
 
 const typeKeyboard = Markup.inlineKeyboard([
-  [Markup.button.callback('🔹 Для себя (личный бренд)', 'type_personal')],
-  [Markup.button.callback('🔸 Для бизнеса / привлечения партнёров', 'type_business')]
+  [Markup.button.callback('🔹 Для себя — развиваю личный бренд, делюсь экспертизой', 'type_personal')],
+  [Markup.button.callback('🏢 Для бизнеса — есть компания с продуктом, хочу строить сеть партнёрских продаж', 'type_business')]
+]);
+
+// Квалификационные вопросы для бизнес-ветки
+const qualLegalKeyboard = Markup.inlineKeyboard([
+  [Markup.button.callback('✅ Да, есть ИП или ООО', 'qual_legal_yes')],
+  [Markup.button.callback('⏳ Пока нет, в процессе', 'qual_legal_no')]
+]);
+
+const qualRepeatKeyboard = Markup.inlineKeyboard([
+  [Markup.button.callback('🔄 Да, клиенты покупают регулярно / подписка', 'qual_repeat_yes')],
+  [Markup.button.callback('🛍 В основном разовые покупки', 'qual_repeat_mid')],
+  [Markup.button.callback('🧪 Пока тестируем модель', 'qual_repeat_no')]
+]);
+
+const qualRevenueKeyboard = Markup.inlineKeyboard([
+  [Markup.button.callback('📊 До 300 000 ₽/мес', 'qual_rev_low')],
+  [Markup.button.callback('📈 300 000 – 1 000 000 ₽/мес', 'qual_rev_mid')],
+  [Markup.button.callback('🚀 Больше 1 000 000 ₽/мес', 'qual_rev_high')]
 ]);
 
 const ageKeyboard = Markup.inlineKeyboard([
@@ -120,5 +138,6 @@ module.exports = {
   topicsKeyboard, socialKeyboard, styleKeyboard,
   purchaseFreqKeyboard, partnersKeyboard,
   ratingKeyboard, feedbackKeyboard, nextPostKeyboard,
-  finalKeyboard, skipKeyboard, continueKeyboard
+  finalKeyboard, skipKeyboard, continueKeyboard,
+  qualLegalKeyboard, qualRepeatKeyboard, qualRevenueKeyboard
 };
