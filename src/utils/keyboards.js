@@ -1,8 +1,8 @@
 const { Markup } = require('telegraf');
 
 const typeKeyboard = Markup.inlineKeyboard([
-  [Markup.button.callback('🔹 Для себя — развиваю личный бренд, делюсь экспертизой', 'type_personal')],
-  [Markup.button.callback('🏢 Для бизнеса — есть компания с продуктом, хочу строить сеть партнёрских продаж', 'type_business')]
+  [Markup.button.callback('🔹 Для себя — личный бренд и экспертиза', 'type_personal')],
+  [Markup.button.callback('🏢 Для бизнеса — строю партнёрскую сеть продаж', 'type_business')]
 ]);
 
 // Квалификационные вопросы для бизнес-ветки
@@ -12,7 +12,7 @@ const qualLegalKeyboard = Markup.inlineKeyboard([
 ]);
 
 const qualRepeatKeyboard = Markup.inlineKeyboard([
-  [Markup.button.callback('🔄 Да, клиенты покупают регулярно / подписка', 'qual_repeat_yes')],
+  [Markup.button.callback('🔄 Да, покупают регулярно / подписка', 'qual_repeat_yes')],
   [Markup.button.callback('🛍 В основном разовые покупки', 'qual_repeat_mid')],
   [Markup.button.callback('🧪 Пока тестируем модель', 'qual_repeat_no')]
 ]);
@@ -53,7 +53,8 @@ function buildInterestsKeyboard(selected = []) {
       item.cb
     )];
   });
-  buttons.push([Markup.button.callback('✅ Готово', 'interests_done')]);
+  buttons.push([Markup.button.callback('━━━━━━━━━━━━━━━━━━', 'noop')]);
+  buttons.push([Markup.button.callback('🟢 ГОТОВО — продолжить →', 'interests_done')]);
   return Markup.inlineKeyboard(buttons);
 }
 
