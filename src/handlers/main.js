@@ -370,11 +370,6 @@ async function handleCallback(ctx) {
     setStep(telegramId, 'ask_style');
     return;
   }
-      kb.styleKeyboard
-    );
-    setStep(telegramId, 'ask_style');
-    return;
-  }
 
   // Стиль
   if (data.startsWith('style_')) {
