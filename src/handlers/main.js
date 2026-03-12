@@ -91,11 +91,35 @@ async function handleTextInput(ctx) {
     return;
   }
 
+  // Ввод другой соцсети
+  if (step === 'ask_social_other') {
+    db.updateUser(telegramId, { social_network: text });
+    setState(telegramId, { social_network: text });
+    await ctx.reply(
+      `✅ Отлично, буду готовить посты для "${text}"!\n\nТеперь выбери стиль:`,
+      kb.styleKeyboard
+    );
+    setStep(telegramId, 'ask_style');
+    return;
+  }
+
+  // Главный вопрос — о чём пост
+  if (step === 'ask_post_idea') {
+    db.updateUser(telegramId, { keywords: text });
+    setState(telegramId, { keywords: text, post_idea: text });
+    await ctx.reply(
+      '🔥 Отлично! Теперь пришли ссылку на свою страницу в соцсети — посмотрю как ты уже пишешь (необязательно):',
+      kb.skipKeyboard
+    );
+    setStep(telegramId, 'ask_profile');
+    return;
+  }
+
   if (step === 'ask_keywords') {
     db.updateUser(telegramId, { keywords: text });
     setState(telegramId, { keywords: text });
     await ctx.reply(
-      'Отлично! Теперь пришли ссылку на свою страницу в соцсети (необязательно):',
+      '🔥 Отлично! Теперь пришли ссылку на свою страницу в соцсети (необязательно):',
       kb.skipKeyboard
     );
     setStep(telegramId, 'ask_profile');
@@ -161,6 +185,9 @@ async function handleCallback(ctx) {
   const state = getState(telegramId);
 
   await ctx.answerCbQuery();
+
+  // Разделитель (нажатие не делает ничего)
+  if (data === 'noop') return;
 
   // Тип
   if (data === 'type_personal') return handleTypeChoice(ctx, 'personal');
@@ -323,17 +350,26 @@ async function handleCallback(ctx) {
 
   // Соцсеть
   if (data.startsWith('sn_')) {
-    const snMap = { sn_vk: 'ВКонтакте', sn_tg: 'Telegram', sn_ig: 'Instagram', sn_other: 'Другое' };
+    const snMap = { sn_vk: 'ВКонтакте', sn_tg: 'Telegram', sn_ig: 'Instagram' };
+
+    if (data === 'sn_other') {
+      // Просим ввести название соцсети текстом
+      await ctx.editMessageText('Напиши название своей соцсети или платформы (например: YouTube, TikTok, LinkedIn):');
+      setStep(telegramId, 'ask_social_other');
+      return;
+    }
+
     const sn = snMap[data];
     db.updateUser(telegramId, { social_network: sn });
     setState(telegramId, { social_network: sn });
 
-    if (data === 'sn_other') {
-      // Для "другое" соцсеть просто сохраняем и идём к стилю
-    }
-
     await ctx.editMessageText(
-      'Пришли 2–3 примера постов, которые тебе нравятся по стилю (текстом или ссылками).\nИли выбери готовый стиль:',
+      'Выбери стиль постов:',
+      kb.styleKeyboard
+    );
+    setStep(telegramId, 'ask_style');
+    return;
+  }
       kb.styleKeyboard
     );
     setStep(telegramId, 'ask_style');
@@ -350,10 +386,10 @@ async function handleCallback(ctx) {
     db.updateUser(telegramId, { style });
     setState(telegramId, { style });
     await ctx.editMessageText(
-      'Есть ключевые слова или фразы, которые обязательно нужно включить в посты? (необязательно)',
-      kb.skipKeyboard
+      '✍️ Последний шаг!\n\nРасскажи коротко — *о чём ты хочешь написать?*\n\nНапример: "хочу рассказать как я бросил офис и открыл своё дело" или "хочу привлечь партнёров в свой бизнес по доставке"\n\nЧем конкретнее — тем точнее получится пост 🎯',
+      { parse_mode: 'Markdown', ...kb.skipKeyboard }
     );
-    setStep(telegramId, 'ask_keywords');
+    setStep(telegramId, 'ask_post_idea');
     return;
   }
 
@@ -363,13 +399,13 @@ async function handleCallback(ctx) {
     if (step === 'ask_style' || step === 'ask_style_examples') {
       setState(telegramId, { style: 'Дружелюбный' });
       await ctx.editMessageText(
-        'Использую дружелюбный стиль по умолчанию.\n\nЕсть ключевые слова? (необязательно)',
-        kb.skipKeyboard
+        '✍️ Расскажи коротко — *о чём ты хочешь написать?*\n\nНапример: "хочу рассказать как похудел на 10 кг" или "ищу партнёров для бизнеса"\n\nЧем конкретнее — тем точнее получится пост 🎯',
+        { parse_mode: 'Markdown', ...kb.skipKeyboard }
       );
-      setStep(telegramId, 'ask_keywords');
-    } else if (step === 'ask_keywords') {
+      setStep(telegramId, 'ask_post_idea');
+    } else if (step === 'ask_post_idea') {
       await ctx.editMessageText(
-        'Хорошо! Пришли ссылку на свою страницу в соцсети (необязательно):',
+        'Хорошо, буду генерировать на основе выбранной темы!\n\nПришли ссылку на свою страницу в соцсети (необязательно):',
         kb.skipKeyboard
       );
       setStep(telegramId, 'ask_profile');
