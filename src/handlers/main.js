@@ -20,16 +20,38 @@ async function handleStart(ctx) {
   const telegramId = ctx.from.id;
   const username = ctx.from.username;
 
-  // Обработка реферальной ссылки
+  // Обработка реферальной ссылки и сегмента
   const startPayload = ctx.message?.text?.split(' ')[1];
-  if (startPayload && startPayload.startsWith('ref_')) {
-    const referrer = db.getUserByRefCode(startPayload);
-    if (referrer && String(referrer.telegram_id) !== String(telegramId)) {
-      setState(telegramId, { referred_by: startPayload });
+  let segment = 'general';
+
+  if (startPayload) {
+    if (startPayload.includes('_noshop')) {
+      segment = 'noshop'; // Партнёры Shop не из структуры
+    } else if (startPayload.includes('_deepinvol')) {
+      segment = 'business'; // Прямо на бизнес-ветку
+    }
+
+    if (startPayload.startsWith('ref_')) {
+      const referrer = db.getUserByRefCode(startPayload);
+      if (referrer && String(referrer.telegram_id) !== String(telegramId)) {
+        setState(telegramId, { referred_by: startPayload });
+      }
     }
   }
 
   db.createUser(telegramId, username);
+  db.updateUser(telegramId, { segment });
+  setState(telegramId, { segment });
+
+  // Если сегмент noshop — сначала спрашиваем фильтрующий вопрос
+  if (segment === 'noshop') {
+    await ctx.reply(
+      `Привет! 👋 Я помогу тебе создавать посты которые реально читают и на которые откликаются.\n\nПара секунд — скажи, ты уже работаешь с какой-то партнёрской программой или сетевым бизнесом?`,
+      kb.partnerFilterKeyboard
+    );
+    setStep(telegramId, 'ask_partner_filter');
+    return;
+  }
 
   await ctx.reply(
     `Привет! Давай честно: бывает, что ты садишься писать пост, смотришь на пустой экран и не знаешь, с чего начать? Или тратишь 2 часа, а результат всё равно не нравится? А может, ты вообще не публикуешь, потому что «всё равно никто не прочитает»?\n\nЗнаешь, в чём проблема? Часто мы пытаемся писать «красиво», а не про то, что действительно волнует нашу аудиторию.\n\nЯ здесь, чтобы снять с тебя эту головную боль. Ты просто расскажешь мне, о чём хочешь написать и для кого, а я сделаю пост, который захочешь опубликовать сам.\n\nГотов? Погнали! 🚀`,
@@ -50,12 +72,12 @@ async function handleTypeChoice(ctx, userType) {
     );
     setStep(telegramId, 'ask_name');
   } else {
-    // Бизнес — начинаем квалификацию
+    // Бизнес — сразу в калькулятор потерь
     await ctx.editMessageText(
-      '🏢 Отлично! Пара быстрых вопросов чтобы я лучше понял твой бизнес.\n\n*Ваш бизнес оформлен юридически (ИП или ООО)?*',
-      { parse_mode: 'Markdown', ...kb.qualLegalKeyboard }
+      '🏢 Отлично!\n\nПрежде чем генерировать посты — давай посчитаем сколько ты сейчас теряешь на ручном управлении партнёрской сетью.\n\n*Займёт 3 минуты. В конце покажу конкретную цифру.*\n\n1️⃣ Сколько партнёров сейчас в твоей сети?\n_(напиши число, например: 47)_',
+      { parse_mode: 'Markdown' }
     );
-    setStep(telegramId, 'qual_legal');
+    setStep(telegramId, 'calc_partners_count');
   }
 }
 
@@ -157,6 +179,143 @@ async function handleTextInput(ctx) {
     return;
   }
 
+  if (step === 'ask_deepinvol_contact') {
+    const user = db.getUser(telegramId);
+    db.saveDeepinvolLead(telegramId, ctx.from.username, user?.name, user?.business_desc, text);
+    await ctx.telegram.sendMessage(
+      process.env.ADMIN_CHAT_ID,
+      `🏢 НОВЫЙ ЛИД DEEPINVOL!\n\nИмя: ${user?.name || 'не указано'}\nUsername: @${ctx.from.username || 'нет'}\nBusiness: ${user?.business_desc || 'нет'}\nКонтакт: ${text}`
+    );
+    await ctx.reply('✅ Отлично! Мы свяжемся с тобой в ближайшее время.\n\nПока можешь продолжать использовать бота — генерируй посты для привлечения первых партнёров в свой бизнес 🚀');
+    setStep(telegramId, null);
+    return;
+  }
+
+  // ─── Калькулятор потерь (бизнес-ветка) ───────────────────
+  if (step === 'calc_partners_count') {
+    const num = parseInt(text);
+    if (isNaN(num) || num < 1) {
+      await ctx.reply('Напиши число — сколько партнёров в сети? (например: 47)');
+      return;
+    }
+    setState(telegramId, { calc_partners: num });
+    await ctx.reply(
+      `2️⃣ Сколько *уровней вознаграждения* в твоей системе?\n\n_(например: 3 уровня, 5 уровней — напиши цифру)_`,
+      { parse_mode: 'Markdown' }
+    );
+    setStep(telegramId, 'calc_levels');
+    return;
+  }
+
+  if (step === 'calc_levels') {
+    const num = parseInt(text);
+    if (isNaN(num) || num < 1) {
+      await ctx.reply('Напиши число уровней (например: 3)');
+      return;
+    }
+    setState(telegramId, { calc_levels: num });
+    await ctx.reply(
+      `3️⃣ Сколько *часов в месяц* уходит на расчёт выплат партнёрам?\n\n_(считай всё: Excel, проверки, звонки с вопросами "почему мне столько начислили?" — напиши число часов)_`,
+      { parse_mode: 'Markdown' }
+    );
+    setStep(telegramId, 'calc_hours');
+    return;
+  }
+
+  if (step === 'calc_hours') {
+    const num = parseFloat(text);
+    if (isNaN(num) || num < 0) {
+      await ctx.reply('Напиши число часов (например: 12)');
+      return;
+    }
+    setState(telegramId, { calc_hours: num });
+    await ctx.reply(
+      `4️⃣ Были ли *ошибки в выплатах* за последние 3 месяца?\n\n_(партнёр получил не ту сумму, недоплата, переплата, конфликт из-за расчётов)_`,
+      kb.calcErrorsKeyboard
+    );
+    setStep(telegramId, 'calc_errors');
+    return;
+  }
+
+  if (step === 'calc_hourly_rate') {
+    const rate = parseInt(text) || 1500;
+    setState(telegramId, { calc_rate: rate });
+    await showCalculatorResult(ctx);
+    return;
+  }
+
+  // ─── Старое интервью (текстовые ответы) ───────────────────
+  if (step === 'ask_business_interview') {
+    setState(telegramId, { interview_desc: text });
+    await ctx.reply(
+      '2️⃣ *Какую главную проблему хочешь решить с помощью партнёрской сети?*',
+      { parse_mode: 'Markdown' }
+    );
+    setStep(telegramId, 'interview_problem');
+    return;
+  }
+
+  if (step === 'interview_problem') {
+    setState(telegramId, { interview_problem: text });
+    await ctx.reply(
+      '3️⃣ *Пробовали ли вы уже привлекать партнёров или агентов для продаж?*\n\nЕсли да — что получилось? Если нет — почему не пробовали?',
+      { parse_mode: 'Markdown' }
+    );
+    setStep(telegramId, 'interview_tried');
+    return;
+  }
+
+  if (step === 'interview_tried') {
+    setState(telegramId, { interview_tried: text });
+    await ctx.reply(
+      '4️⃣ *Вопрос про цену платформы:*\n\nПри каком ценнике в месяц вы бы *точно купили* доступ к платформе для управления партнёрской сетью?\n\n_(выбери один вариант)_',
+      { parse_mode: 'Markdown', ...kb.wtpYesKeyboard }
+    );
+    setStep(telegramId, 'interview_wtp_yes');
+    return;
+  }
+
+  if (step === 'interview_nps_comment') {
+    const istate = getState(telegramId);
+    // Сохраняем всё интервью
+    db.saveInterview(telegramId, {
+      name: istate.name,
+      business_desc: istate.business_desc || istate.interview_desc,
+      main_problem: istate.interview_problem,
+      tried_before: istate.interview_tried,
+      wtp_yes: istate.wtp_yes,
+      wtp_maybe: istate.wtp_maybe,
+      wtp_no: istate.wtp_no,
+      nps_score: istate.interview_nps
+    });
+    db.saveNPS(telegramId, 'business', istate.interview_nps, text);
+
+    // Уведомляем админа
+    await ctx.telegram.sendMessage(
+      process.env.ADMIN_CHAT_ID,
+      `📋 НОВОЕ ИНТЕРВЬЮ!\n\n` +
+      `👤 @${ctx.from.username || telegramId}\n` +
+      `🏢 Бизнес: ${istate.interview_desc || istate.business_desc || '?'}\n` +
+      `❓ Проблема: ${istate.interview_problem || '?'}\n` +
+      `🔄 Пробовал: ${istate.interview_tried || '?'}\n` +
+      `💰 WTP точно: ${istate.wtp_yes || '?'}\n` +
+      `💰 WTP может: ${istate.wtp_maybe || '?'}\n` +
+      `💰 WTP нет: ${istate.wtp_no || '?'}\n` +
+      `⭐️ NPS: ${istate.interview_nps}/10\n` +
+      `💬 Комментарий: ${text}`
+    ).catch(() => {});
+
+    await ctx.reply('🙏 Спасибо за честные ответы! Это очень помогает.\n\nТеперь перейдём к квалификации и генерации постов 🚀');
+
+    // Переходим к квалификации
+    await ctx.reply(
+      '✅ *Ваш бизнес оформлен юридически (ИП или ООО)?*',
+      { parse_mode: 'Markdown', ...kb.qualLegalKeyboard }
+    );
+    setStep(telegramId, 'qual_legal');
+    return;
+  }
+
   if (step === 'ask_contact') {
     await ctx.telegram.sendMessage(
       process.env.ADMIN_CHAT_ID,
@@ -188,6 +347,187 @@ async function handleCallback(ctx) {
 
   // Разделитель (нажатие не делает ничего)
   if (data === 'noop') return;
+
+  // ─── Фильтр партнёров Shop ────────────────────────────────
+  if (data === 'pf_has_partner') {
+    // Уже в партнёрской программе — скрываем Shop, ведём к другим темам
+    db.updateUser(telegramId, { segment: 'noshop' });
+    setState(telegramId, { segment: 'noshop' });
+    await ctx.editMessageText(
+      '👍 Понял! Тогда сосредоточимся на темах которые помогут тебе развивать другие направления и привлекать новую аудиторию.\n\nКак тебя зовут?'
+    );
+    setStep(telegramId, 'ask_name');
+    return;
+  }
+
+  if (data === 'pf_no_partner') {
+    // Не в партнёрской программе — показываем всё
+    db.updateUser(telegramId, { segment: 'general' });
+    setState(telegramId, { segment: 'general' });
+    await ctx.editMessageText(
+      `Отлично! Давай сделаем посты которые реально работают.\n\nКак тебя зовут?`
+    );
+    setStep(telegramId, 'ask_name');
+    return;
+  }
+
+  if (data === 'pf_has_business') {
+    // Есть свой бизнес — направляем в бизнес-ветку
+    db.updateUser(telegramId, { segment: 'business', user_type: 'business' });
+    setState(telegramId, { segment: 'business', user_type: 'business' });
+    await ctx.editMessageText(
+      '🏢 Отлично! Пара быстрых вопросов чтобы я лучше понял твой бизнес.\n\n*Бизнес оформлен юридически (ИП или ООО)?*',
+      { parse_mode: 'Markdown', ...kb.qualLegalKeyboard }
+    );
+    setStep(telegramId, 'qual_legal');
+    return;
+  }
+
+  // ─── Калькулятор потерь — колбэки ────────────────────────
+  if (data.startsWith('calc_errors_')) {
+    const hasErrors = data === 'calc_errors_yes';
+    setState(telegramId, { calc_errors: hasErrors });
+    await ctx.editMessageText(
+      `5️⃣ Последний вопрос.\n\nСколько стоит твой рабочий час?\n_(это нужно для точного расчёта — напиши сумму в рублях, например: 2000)_`
+    );
+    setStep(telegramId, 'calc_hourly_rate');
+    return;
+  }
+
+  if (data === 'pilot_yes') {
+    await ctx.editMessageText('🚀 Отлично! Напиши свой контакт — имя и телефон или @username в Telegram:');
+    setStep(telegramId, 'ask_deepinvol_contact');
+    return;
+  }
+
+  if (data === 'pilot_later') {
+    // Переходим к генерации постов
+    await ctx.editMessageText(
+      '👍 Понял! Когда будешь готов — просто напиши /start и вернёмся к этому.\n\nА пока давай сделаем посты которые привлекут новых партнёров в твою сеть 💪\n\nКак тебя зовут?'
+    );
+    setStep(telegramId, 'ask_name');
+    return;
+  }
+
+  if (data === 'pilot_questions') {
+    await ctx.editMessageText(
+      '💬 Напиши свой вопрос — отвечу лично:'
+    );
+    setStep(telegramId, 'ask_user_question');
+    return;
+  }
+
+  // ─── Интервью ─────────────────────────────────────────────
+  if (data === 'interview_start') {
+    await ctx.editMessageText(
+      '1️⃣ *Расскажи коротко — чем занимается твой бизнес?*\n\nНапиши 2-3 предложения: что продаёшь, кому, как давно работаешь.',
+      { parse_mode: 'Markdown' }
+    );
+    setStep(telegramId, 'interview_problem');
+    // Используем interview_problem для описания бизнеса — переопределяем шаг
+    setStep(telegramId, 'ask_business_interview');
+    return;
+  }
+
+  if (data === 'interview_skip') {
+    // Пропустили интервью — сразу к квалификации
+    await ctx.editMessageText(
+      '✅ *Ваш бизнес оформлен юридически (ИП или ООО)?*',
+      { parse_mode: 'Markdown', ...kb.qualLegalKeyboard }
+    );
+    setStep(telegramId, 'qual_legal');
+    return;
+  }
+
+  // WTP — точно купил бы
+  if (data.startsWith('wtp_yes_')) {
+    const val = data.replace('wtp_yes_', '');
+    const labels = { '5k': 'до 5 000 ₽', '15k': '5 000–15 000 ₽', '30k': '15 000–30 000 ₽', '75k': '30 000–75 000 ₽', '75kplus': '75 000+ ₽' };
+    setState(telegramId, { wtp_yes: labels[val] });
+    await ctx.editMessageText(
+      `✅ Записал!\n\nПри каком ценнике вы бы *подумали* — возможно купили бы?`,
+      { parse_mode: 'Markdown', ...kb.wtpMaybeKeyboard }
+    );
+    setStep(telegramId, 'interview_wtp_maybe');
+    return;
+  }
+
+  // WTP — подумал бы
+  if (data.startsWith('wtp_maybe_')) {
+    const val = data.replace('wtp_maybe_', '');
+    const labels = { '5k': 'до 5 000 ₽', '15k': '5 000–15 000 ₽', '30k': '15 000–30 000 ₽', '75k': '30 000–75 000 ₽', '75kplus': '75 000+ ₽' };
+    setState(telegramId, { wtp_maybe: labels[val] });
+    await ctx.editMessageText(
+      `Понял!\n\nПри каком ценнике вы бы *точно отказались*?`,
+      { parse_mode: 'Markdown', ...kb.wtpNoKeyboard }
+    );
+    setStep(telegramId, 'interview_wtp_no');
+    return;
+  }
+
+  // WTP — отказал
+  if (data.startsWith('wtp_no_')) {
+    const val = data.replace('wtp_no_', '');
+    const labels = { '5k': 'до 5 000 ₽', '15k': '5 000–15 000 ₽', '30k': '15 000–30 000 ₽', '75k': '30 000–75 000 ₽', '75kplus': '75 000+ ₽' };
+    setState(telegramId, { wtp_no: labels[val] });
+    await ctx.editMessageText(
+      '5️⃣ *Последний вопрос — NPS:*\n\nС какой вероятностью от 0 до 10 вы порекомендуете нашу платформу коллеге-предпринимателю?\n\n_0 — точно не порекомендую, 10 — точно порекомендую_',
+      { parse_mode: 'Markdown', ...kb.npsKeyboard() }
+    );
+    setStep(telegramId, 'interview_nps');
+    return;
+  }
+
+  // NPS оценка
+  if (data.startsWith('nps_')) {
+    const score = parseInt(data.replace('nps_', ''));
+    setState(telegramId, { interview_nps: score });
+    const step = getStep(telegramId);
+
+    if (step === 'interview_nps') {
+      // Интервью — просим комментарий
+      await ctx.editMessageText(
+        `Оценка ${score}/10 — записал! 🙏\n\nНапиши коротко *почему именно такая оценка*? (можно 1 предложение)`,
+        { parse_mode: 'Markdown' }
+      );
+      setStep(telegramId, 'interview_nps_comment');
+    } else {
+      // NPS для обычных пользователей
+      db.saveNPS(telegramId, 'personal', score, '');
+      const msg = score >= 9
+        ? '🔥 Спасибо! Ты промоутер — это лучший комплимент!'
+        : score >= 7
+        ? '😊 Спасибо за оценку!'
+        : '🙏 Спасибо за честность — будем работать над улучшением!';
+      await ctx.editMessageText(msg);
+
+      // Показываем реферальную ссылку как призыв к действию
+      const user = db.getUser(telegramId);
+      const refLink = `https://t.me/${ctx.botInfo.username}?start=${user.referral_code}`;
+      await ctx.reply(
+        `🎁 Кстати — за каждого друга которого пригласишь получишь *10%* от его оплаты!\n\nТвоя ссылка:\n\`${refLink}\``,
+        { parse_mode: 'Markdown' }
+      );
+    }
+    return;
+  }
+
+  // ─── Deepinvol лид ────────────────────────────────────────
+  if (data === 'deepinvol_join') {
+    await ctx.editMessageText(
+      '🚀 Отлично! Напиши коротко — чем занимается твой бизнес и как с тобой связаться (телефон или Telegram):',
+    );
+    setStep(telegramId, 'ask_deepinvol_contact');
+    return;
+  }
+
+  if (data === 'deepinvol_info') {
+    await ctx.editMessageText(
+      '📋 *Deepinvol* — это платформа для владельцев бизнеса которые хотят выстроить партнёрскую сеть продаж.\n\nВместо найма менеджеров — независимые партнёры продают твой продукт и получают комиссию. Ты платишь только за результат.\n\nМы сейчас набираем первых 20 компаний на особых условиях входа.\n\nХочешь попасть в список?',
+      { parse_mode: 'Markdown', ...kb.deepinvolKeyboard }
+    );
+    return;
+  }
 
   // Тип
   if (data === 'type_personal') return handleTypeChoice(ctx, 'personal');
@@ -425,12 +765,58 @@ async function handleCallback(ctx) {
     db.updateRating(genId, rating);
 
     if (rating >= 4) {
-      await ctx.editMessageReplyMarkup(kb.nextPostKeyboard(genId).reply_markup);
-      await ctx.reply(`🎉 Отлично! Оценка ${rating}/5. Пост готов к публикации!`);
+      const user = db.getUser(telegramId);
+      const socialNetwork = user.social_network || 'Telegram';
+      const currentIdx = state.current_post_index || 0;
+      const nextIdx = currentIdx + 1;
+
+      // Убираем кнопки оценки
+      await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
+
+      const approvedMsg = rating === 5
+        ? '🔥 Огонь! Это именно то что нужно!'
+        : '😊 Отлично! Пост готов к публикации.';
+
+      await ctx.reply(approvedMsg);
+
+      // Инструкция по публикации
+      const guides = {
+        'ВКонтакте': '📋 *Как опубликовать во ВКонтакте:*\n1. Скопируй текст поста выше (зажми → Копировать)\n2. Открой ВКонтакте → нажми "Что у вас нового?"\n3. Вставь текст\n4. Добавь фото по желанию\n5. Нажми "Опубликовать" ✅',
+        'Telegram': '📋 *Как опубликовать в Telegram:*\n1. Скопируй текст поста выше\n2. Открой свой канал или группу\n3. Нажми на поле сообщения → вставь текст\n4. Нажми отправить ✅\n\n💡 *Совет:* для форматирования используй **жирный** и _курсив_',
+        'Instagram': '📋 *Как опубликовать в Instagram:*\n1. Скопируй текст поста выше\n2. Открой Instagram → нажми + (новая публикация)\n3. Выбери фото или Reels\n4. В поле "Подпись" вставь текст\n5. Нажми "Поделиться" ✅\n\n💡 *Совет:* Instagram режет текст — первые 2 строки самые важные!'
+      };
+      const guide = guides[socialNetwork] || '📋 Скопируй текст поста и вставь в свою соцсеть. Первые 2 строки — самые важные!';
+      await ctx.reply(guide, { parse_mode: 'Markdown' });
+
+      // NPS после первого одобренного поста у обычных пользователей
+      if (currentIdx === 0 && user.user_type !== 'business') {
+        await ctx.reply(
+          '⭐️ *Быстрый вопрос:*\n\nС какой вероятностью от 0 до 10 ты порекомендуешь этого бота другу?\n\n_0 — точно нет, 10 — точно да_',
+          { parse_mode: 'Markdown', ...kb.npsKeyboard() }
+        );
+        setStep(telegramId, 'nps_personal');
+      }
+
+      if (nextIdx >= POST_TYPES.length) {
+        await showFinalScreen(ctx);
+      } else {
+        await ctx.reply(
+          `✅ Пост ${currentIdx + 1} из 4 готов!\n\nПереходим к следующему?`,
+          kb.nextPostKeyboard(genId)
+        );
+        setState(telegramId, { current_post_index: nextIdx });
+      }
+
     } else {
+      // Оценка 1, 2 или 3 — спрашиваем причину
+      const messages = {
+        1: '😞 Совсем не то? Давай разберёмся и переделаем полностью.\n\n*Что именно не понравилось?*',
+        2: '🤔 Понял, есть над чем поработать.\n\n*Что мешает опубликовать этот пост?*',
+        3: '✏️ Почти готово, но что-то не так.\n\n*Что подправить?*'
+      };
       await ctx.reply(
-        'Понял, доработаем! Что не понравилось?',
-        kb.feedbackKeyboard()
+        messages[rating] || '✏️ Что изменить?',
+        { parse_mode: 'Markdown', ...kb.feedbackKeyboard() }
       );
       setState(telegramId, { current_gen_id: genId, awaiting_feedback: true });
     }
@@ -440,10 +826,11 @@ async function handleCallback(ctx) {
   // Обратная связь по посту
   if (data.startsWith('fb_')) {
     const fbMap = {
-      fb_long: 'Слишком длинно, нужно короче',
-      fb_style: 'Не в моём стиле, нужно другой тон',
-      fb_facts: 'Не хватает фактов и конкретики',
-      fb_ads: 'Слишком рекламно, нужно мягче'
+      fb_long: 'Слишком длинно, нужно короче — сократи до сути',
+      fb_style: 'Не мой стиль — перепиши другим тоном',
+      fb_facts: 'Нет конкретики — добавь факты, цифры, примеры',
+      fb_ads: 'Слишком рекламно — сделай мягче, больше пользы',
+      fb_angle: 'Не та идея — возьми другой угол зрения на тему, другую историю'
     };
 
     if (data === 'fb_custom') {
@@ -461,7 +848,7 @@ async function handleCallback(ctx) {
       const genId = db.saveGeneration(telegramId, state.current_post_type, userData.topic, userData.social_network, newPost);
       setState(telegramId, { current_gen_id: genId, regen_count: (state.regen_count || 0) + 1 });
       await ctx.reply(
-        `📝 *${state.current_post_type.toUpperCase()}* (новый вариант)\n\n${newPost}`,
+        `📝 *${state.current_post_type.toUpperCase()}* (новый вариант)\n\n${newPost}\n\n⭐️ Оцени:`,
         { parse_mode: 'Markdown', ...kb.ratingKeyboard(genId) }
       );
     } catch (e) {
@@ -473,15 +860,14 @@ async function handleCallback(ctx) {
   // Следующий пост
   if (data.startsWith('next_')) {
     const currentIdx = state.current_post_index || 0;
-    const nextIdx = currentIdx + 1;
 
-    if (nextIdx >= POST_TYPES.length) {
+    if (currentIdx >= POST_TYPES.length) {
       await showFinalScreen(ctx);
       return;
     }
 
-    setState(telegramId, { current_post_index: nextIdx, regen_count: 0 });
-    await generateNextPost(ctx, nextIdx);
+    setState(telegramId, { regen_count: 0 });
+    await generateNextPost(ctx, currentIdx);
     return;
   }
 
@@ -514,6 +900,75 @@ async function handleCallback(ctx) {
     setStep(telegramId, 'ask_user_question');
     return;
   }
+}
+
+// ─── Калькулятор потерь — результат ──────────────────────
+async function showCalculatorResult(ctx) {
+  const telegramId = ctx.from.id;
+  const state = getState(telegramId);
+
+  const partners = state.calc_partners || 0;
+  const levels = state.calc_levels || 1;
+  const hours = state.calc_hours || 0;
+  const rate = state.calc_rate || 1500;
+  const hasErrors = state.calc_errors || false;
+
+  // Расчёт потерь
+  const monthlyCost = Math.round(hours * rate);
+  const yearlyCost = monthlyCost * 12;
+  const errorCost = hasErrors ? Math.round(partners * 500) : 0; // ~500 руб риск на партнёра при ошибках
+  const totalMonthly = monthlyCost + errorCost;
+
+  // Мини-демо расчёта
+  const demoLevel1 = 10; // % первого уровня для демо
+  const demoSale = 10000; // средняя сделка
+  const demoBonus = Math.round(demoSale * demoLevel1 / 100);
+
+  setState(telegramId, {
+    calc_monthly_cost: totalMonthly,
+    calc_yearly_cost: yearlyCost,
+    interview_desc: `Партнёров: ${partners}, уровней: ${levels}`
+  });
+
+  // Сохраняем в интервью
+  db.saveInterview(telegramId, {
+    business_desc: `Партнёров: ${partners}, уровней: ${levels}`,
+    main_problem: `Часов на расчёты: ${hours}/мес, ошибки: ${hasErrors ? 'да' : 'нет'}`,
+    tried_before: `Стоимость часа: ${rate} руб`
+  });
+
+  await ctx.reply(
+    `📊 *Вот твой расчёт:*\n\n` +
+    `👥 Партнёров в сети: *${partners}*\n` +
+    `📐 Уровней вознаграждения: *${levels}*\n` +
+    `⏱ Часов на расчёты в месяц: *${hours}*\n\n` +
+    `━━━━━━━━━━━━━━━\n` +
+    `💸 *Ты тратишь каждый месяц:*\n` +
+    `  На расчёты: ~${monthlyCost.toLocaleString('ru')} руб\n` +
+    (hasErrors ? `  Риск ошибок: ~${errorCost.toLocaleString('ru')} руб\n` : '') +
+    `  *Итого: ~${totalMonthly.toLocaleString('ru')} руб/мес*\n` +
+    `  *В год: ~${yearlyCost.toLocaleString('ru')} руб*\n\n` +
+    `━━━━━━━━━━━━━━━\n` +
+    `🔢 *Мини-демо — как выглядит автоматический расчёт:*\n\n` +
+    `Сделка на ${demoSale.toLocaleString('ru')} ₽\n` +
+    `→ Партнёр 1 уровня получает: *+${demoBonus.toLocaleString('ru')} ₽* автоматически\n` +
+    `→ Его ментор (уровень 2): *+${Math.round(demoBonus * 0.5).toLocaleString('ru')} ₽*\n` +
+    `→ Всё это без Excel, без звонков, без ошибок\n\n` +
+    `📱 Партнёр видит начисление в реальном времени в приложении`,
+    { parse_mode: 'Markdown' }
+  );
+
+  // Небольшая пауза перед следующим сообщением
+  setTimeout(async () => {
+    await ctx.reply(
+      `🎯 *Предложение:*\n\n` +
+      `Мы настроим платформу *бесплатно на 30 дней* специально под твою сеть (${partners} партнёров, ${levels} уровней).\n\n` +
+      `Никакого риска — просто покажем как это работает на твоих данных.\n\n` +
+      `Хочешь попробовать?`,
+      { parse_mode: 'Markdown', ...kb.pilotOfferKeyboard }
+    );
+    setStep(telegramId, 'pilot_offer');
+  }, 1500);
 }
 
 // ─── Запуск генерации ─────────────────────────────────────
@@ -561,14 +1016,27 @@ async function showFinalScreen(ctx) {
   const telegramId = ctx.from.id;
   const user = db.getUser(telegramId);
   const refLink = `https://t.me/${ctx.botInfo.username}?start=${user.referral_code}`;
+  const segment = user.segment || state?.segment || 'general';
 
-  await ctx.reply(
-    `🔥 Все 4 поста готовы!\n\nКак вам такие посты? Хотите получать их регулярно?`,
-    kb.finalKeyboard
-  );
+  // Финальный экран для бизнес-сегмента — воронка Deepinvol
+  if (user.user_type === 'business') {
+    await ctx.reply(
+      `🔥 Все 4 поста готовы!\n\nТеперь главное — когда партнёры начнут откликаться на твои посты, тебе понадобится система для работы с ними: онбординг, обучение, выплаты комиссий.\n\n*Мы строим именно такую платформу — Deepinvol.*\n\nСейчас набираем первых 20 компаний на особых условиях входа. Хочешь попасть в список?`,
+      { parse_mode: 'Markdown', ...kb.deepinvolKeyboard }
+    );
+  } else {
+    await ctx.reply(
+      `🔥 Все 4 поста готовы!\n\nХотите получать такие посты регулярно по всем темам?`,
+      kb.finalKeyboard
+    );
+  }
 
+  // Реферальная ссылка — адаптированная под сегмент
+  const noshopLink = `https://t.me/${ctx.botInfo.username}?start=${user.referral_code}_noshop`;
   await ctx.reply(
-    `🎁 *Реферальная программа*\n\nПриглашай друзей и получай *10%* от их первой оплаты на свой баланс!\n\nТвоя ссылка:\n\`${refLink}\``,
+    `🎁 *Реферальная программа*\n\nПриглашай друзей и получай *10%* от их оплаты!\n\n` +
+    `Обычная ссылка:\n\`${refLink}\`\n\n` +
+    `Ссылка для партнёров Shop (скрывает Shop-темы):\n\`${noshopLink}\``,
     { parse_mode: 'Markdown' }
   );
 }
@@ -606,10 +1074,45 @@ async function handleAdmin(ctx) {
   if (String(ctx.from.id) !== String(process.env.ADMIN_CHAT_ID)) {
     return ctx.reply('Нет доступа');
   }
-  const stats = db.getStats();
-  const topTopics = stats.topTopics.map(t => `• ${t.topic}: ${t.cnt}`).join('\n');
+  const s = db.getStats();
+  const nps = db.getNPSStats();
+  const interviews = db.getInterviews();
+
+  const topTopics = s.topTopics.map(t => `  • ${t.topic}: ${t.cnt}`).join('\n') || '  Пока нет';
+  const topReferrers = s.topReferrers.length > 0
+    ? s.topReferrers.map(r => `  • ${r.name || r.username || r.telegram_id}: ${r.referrals} чел. (платящих: ${r.paid_referrals})`).join('\n')
+    : '  Пока нет';
+
+  // WTP анализ из интервью
+  const wtpYesCounts = {};
+  interviews.forEach(i => { if (i.wtp_yes) wtpYesCounts[i.wtp_yes] = (wtpYesCounts[i.wtp_yes] || 0) + 1; });
+  const wtpTop = Object.entries(wtpYesCounts).sort((a,b) => b[1]-a[1]).map(([k,v]) => `  • ${k}: ${v} чел.`).join('\n') || '  Пока нет';
+
   await ctx.reply(
-    `📊 *Статистика бота*\n\n👥 Пользователей: ${stats.totalUsers}\n📝 Генераций: ${stats.totalGenerations}\n📣 Опубликовано: ${stats.published}\n\n🏆 Топ тем:\n${topTopics}`,
+    `📊 *Статистика бота*\n\n` +
+    `👥 *Пользователи:*\n` +
+    `  Всего: ${s.totalUsers}\n` +
+    `  Бесплатных: ${s.freeUsers}\n` +
+    `  Подписчиков: ${s.paidUsers}\n` +
+    `  💰 Доход (расчётный): ${s.totalRevenue} руб.\n\n` +
+    `📂 *Сегменты:*\n` +
+    `  Обычные: ${s.segmentGeneral}\n` +
+    `  Партнёры Shop (noshop): ${s.segmentNoshop}\n` +
+    `  Бизнес-ветка: ${s.segmentBusiness}\n\n` +
+    `⭐️ *NPS (${nps.total} ответов):*\n` +
+    `  Индекс: ${nps.nps > 0 ? '+' : ''}${nps.nps}\n` +
+    `  Средняя оценка: ${nps.avg}/10\n` +
+    `  Промоутеры (9-10): ${nps.promoters}\n` +
+    `  Нейтралы (7-8): ${nps.passives}\n` +
+    `  Критики (0-6): ${nps.detractors}\n\n` +
+    `📋 *Интервью бизнеса:* ${interviews.length}\n` +
+    `💰 *WTP — точно купили бы:*\n${wtpTop}\n\n` +
+    `🏢 *Лиды Deepinvol:* ${s.deepinvolLeads}\n\n` +
+    `📝 *Генерации:*\n` +
+    `  Всего: ${s.totalGenerations}\n` +
+    `  Опубликовано: ${s.published}\n\n` +
+    `🏆 *Топ тем:*\n${topTopics}\n\n` +
+    `🤝 *Топ рефереры:*\n${topReferrers}`,
     { parse_mode: 'Markdown' }
   );
 }
