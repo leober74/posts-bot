@@ -53,7 +53,7 @@ function buildInterestsKeyboard(selected = []) {
       item.cb
     )];
   });
-  buttons.push([Markup.button.callback('━━━━━━━━━━━━━━━━━━', 'noop')]);
+  buttons.push([Markup.button.callback('— — — — — — — — —', 'noop')]);
   buttons.push([Markup.button.callback('🟢 ГОТОВО — продолжить →', 'interests_done')]);
   return Markup.inlineKeyboard(buttons);
 }
