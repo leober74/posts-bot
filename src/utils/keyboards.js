@@ -92,30 +92,49 @@ const partnersKeyboard = Markup.inlineKeyboard([
 
 function ratingKeyboard(genId) {
   return Markup.inlineKeyboard([
-    [
-      Markup.button.callback('1 😞', `rate_1_${genId}`),
-      Markup.button.callback('2 😕', `rate_2_${genId}`),
-      Markup.button.callback('3 😐', `rate_3_${genId}`),
-      Markup.button.callback('4 😊', `rate_4_${genId}`),
-      Markup.button.callback('5 🔥', `rate_5_${genId}`)
-    ]
+    [Markup.button.callback('1 😞 Не буду выкладывать', `rate_1_${genId}`)],
+    [Markup.button.callback('2 🤔 Для начала пойдёт', `rate_2_${genId}`)],
+    [Markup.button.callback('3 ✏️ Давай переделаем', `rate_3_${genId}`)],
+    [Markup.button.callback('4 😊 Неплохо, выложу', `rate_4_${genId}`)],
+    [Markup.button.callback('5 🔥 Огонь, публикую!', `rate_5_${genId}`)]
   ]);
 }
 
 function feedbackKeyboard() {
   return Markup.inlineKeyboard([
-    [Markup.button.callback('📏 Слишком длинно', 'fb_long')],
-    [Markup.button.callback('🎨 Не в моём стиле', 'fb_style')],
-    [Markup.button.callback('📊 Не хватает фактов', 'fb_facts')],
-    [Markup.button.callback('📢 Слишком рекламно', 'fb_ads')],
-    [Markup.button.callback('✏️ Другое (напишу сам)', 'fb_custom')]
+    [Markup.button.callback('📏 Слишком длинно — сократи', 'fb_long')],
+    [Markup.button.callback('🎨 Не мой стиль — другой тон', 'fb_style')],
+    [Markup.button.callback('📊 Нет конкретики — добавь факты', 'fb_facts')],
+    [Markup.button.callback('📢 Слишком рекламно — помягче', 'fb_ads')],
+    [Markup.button.callback('💡 Не та идея — другой угол', 'fb_angle')],
+    [Markup.button.callback('✏️ Объясню сам что изменить', 'fb_custom')]
+  ]);
+}
+
+function publishGuideKeyboard(genId, socialNetwork) {
+  const guides = {
+    'ВКонтакте': [
+      [Markup.button.callback('📋 Как опубликовать во ВКонтакте', `guide_vk_${genId}`)],
+    ],
+    'Telegram': [
+      [Markup.button.callback('📋 Как опубликовать в Telegram', `guide_tg_${genId}`)],
+    ],
+    'Instagram': [
+      [Markup.button.callback('📋 Как опубликовать в Instagram', `guide_ig_${genId}`)],
+    ]
+  };
+  const guideBtn = guides[socialNetwork] || [[Markup.button.callback('📋 Как скопировать и опубликовать', `guide_other_${genId}`)]];
+  return Markup.inlineKeyboard([
+    ...guideBtn,
+    [Markup.button.callback('▶️ Следующий пост', `next_${genId}`)],
+    [Markup.button.callback('📣 Уже опубликовал!', `published_${genId}`)]
   ]);
 }
 
 function nextPostKeyboard(genId) {
   return Markup.inlineKeyboard([
     [Markup.button.callback('▶️ Следующий пост', `next_${genId}`)],
-    [Markup.button.callback('📣 Я опубликовал этот!', `published_${genId}`)]
+    [Markup.button.callback('📣 Уже опубликовал!', `published_${genId}`)]
   ]);
 }
 
@@ -133,12 +152,82 @@ const continueKeyboard = Markup.inlineKeyboard([
   [Markup.button.callback('➡️ Продолжить', 'continue')]
 ]);
 
+// Вопрос про ошибки в расчётах
+const calcErrorsKeyboard = Markup.inlineKeyboard([
+  [Markup.button.callback('✅ Да, были ошибки / конфликты', 'calc_errors_yes')],
+  [Markup.button.callback('🟢 Нет, всё чисто', 'calc_errors_no')]
+]);
+
+// Оффер пилота
+const pilotOfferKeyboard = Markup.inlineKeyboard([
+  [Markup.button.callback('✅ Да, хочу бесплатный пилот', 'pilot_yes')],
+  [Markup.button.callback('❓ Есть вопросы', 'pilot_questions')],
+  [Markup.button.callback('⏳ Позже, сначала посты', 'pilot_later')]
+]);
+
+// Фильтр для партнёров Shop
+const partnerFilterKeyboard = Markup.inlineKeyboard([
+  [Markup.button.callback('✅ Да, уже работаю с партнёрской программой', 'pf_has_partner')],
+  [Markup.button.callback('🏢 Есть свой бизнес, ищу партнёров', 'pf_has_business')],
+  [Markup.button.callback('🔍 Нет, ищу возможности', 'pf_no_partner')]
+]);
+
+// Воронка Deepinvol для бизнес-ветки
+const deepinvolKeyboard = Markup.inlineKeyboard([
+  [Markup.button.callback('✅ Да, хочу попасть в первые 20', 'deepinvol_join')],
+  [Markup.button.callback('📋 Расскажи подробнее о платформе', 'deepinvol_info')],
+  [Markup.button.callback('⏭ Позже', 'noop')]
+]);
+
+// Интервью — предложение пройти
+const interviewOfferKeyboard = Markup.inlineKeyboard([
+  [Markup.button.callback('✅ Да, пройду (2 минуты)', 'interview_start')],
+  [Markup.button.callback('⏭ Пропустить', 'interview_skip')]
+]);
+
+// WTP ценники
+const wtpYesKeyboard = Markup.inlineKeyboard([
+  [Markup.button.callback('до 5 000 ₽/мес', 'wtp_yes_5k')],
+  [Markup.button.callback('5 000 – 15 000 ₽/мес', 'wtp_yes_15k')],
+  [Markup.button.callback('15 000 – 30 000 ₽/мес', 'wtp_yes_30k')],
+  [Markup.button.callback('30 000 – 75 000 ₽/мес', 'wtp_yes_75k')],
+  [Markup.button.callback('больше 75 000 ₽/мес', 'wtp_yes_75kplus')]
+]);
+
+const wtpMaybeKeyboard = Markup.inlineKeyboard([
+  [Markup.button.callback('до 5 000 ₽/мес', 'wtp_maybe_5k')],
+  [Markup.button.callback('5 000 – 15 000 ₽/мес', 'wtp_maybe_15k')],
+  [Markup.button.callback('15 000 – 30 000 ₽/мес', 'wtp_maybe_30k')],
+  [Markup.button.callback('30 000 – 75 000 ₽/мес', 'wtp_maybe_75k')],
+  [Markup.button.callback('больше 75 000 ₽/мес', 'wtp_maybe_75kplus')]
+]);
+
+const wtpNoKeyboard = Markup.inlineKeyboard([
+  [Markup.button.callback('до 5 000 ₽/мес', 'wtp_no_5k')],
+  [Markup.button.callback('5 000 – 15 000 ₽/мес', 'wtp_no_15k')],
+  [Markup.button.callback('15 000 – 30 000 ₽/мес', 'wtp_no_30k')],
+  [Markup.button.callback('30 000 – 75 000 ₽/мес', 'wtp_no_75k')],
+  [Markup.button.callback('больше 75 000 ₽/мес', 'wtp_no_75kplus')]
+]);
+
+// NPS 0-10
+function npsKeyboard() {
+  return Markup.inlineKeyboard([
+    [0,1,2,3,4].map(n => Markup.button.callback(`${n}`, `nps_${n}`)),
+    [5,6,7,8,9].map(n => Markup.button.callback(`${n}`, `nps_${n}`)),
+    [Markup.button.callback('10', 'nps_10')]
+  ]);
+}
+
 module.exports = {
   typeKeyboard, ageKeyboard, genderKeyboard,
   buildInterestsKeyboard, interestsList,
   topicsKeyboard, socialKeyboard, styleKeyboard,
   purchaseFreqKeyboard, partnersKeyboard,
-  ratingKeyboard, feedbackKeyboard, nextPostKeyboard,
+  ratingKeyboard, feedbackKeyboard, nextPostKeyboard, publishGuideKeyboard,
   finalKeyboard, skipKeyboard, continueKeyboard,
-  qualLegalKeyboard, qualRepeatKeyboard, qualRevenueKeyboard
+  qualLegalKeyboard, qualRepeatKeyboard, qualRevenueKeyboard,
+  partnerFilterKeyboard, deepinvolKeyboard,
+  interviewOfferKeyboard, wtpYesKeyboard, wtpMaybeKeyboard, wtpNoKeyboard, npsKeyboard,
+  calcErrorsKeyboard, pilotOfferKeyboard
 };
