@@ -952,7 +952,12 @@ async function handleCallback(ctx) {
         { parse_mode: 'Markdown', ...kb.ratingKeyboard(genId) }
       );
     } catch (e) {
-      await ctx.reply('Ошибка генерации. Попробуй /start');
+      console.error('Ошибка перегенерации:', e.message);
+      const { Markup } = require('telegraf');
+      await ctx.reply(
+        '⚠️ GigaChat не ответил — попробуй ещё раз',
+        Markup.inlineKeyboard([[Markup.button.callback('🔄 Попробовать ещё раз', data)]])
+      );
     }
     return;
   }
