@@ -848,11 +848,16 @@ async function handleCallback(ctx) {
   // Обратная связь по посту
   if (data.startsWith('fb_')) {
     const fbMap = {
-      fb_long: 'Слишком длинно, нужно короче — сократи до сути',
-      fb_style: 'Не мой стиль — перепиши другим тоном',
-      fb_facts: 'Нет конкретики — добавь факты, цифры, примеры',
-      fb_ads: 'Слишком рекламно — сделай мягче, больше пользы',
-      fb_angle: 'Не та идея — возьми другой угол зрения на тему, другую историю'
+      fb_long:     'Слишком длинно — сократи до сути, убери лишнее',
+      fb_short:    'Слишком коротко — раскрой тему глубже, добавь деталей',
+      fb_style:    'Не мой стиль — перепиши другим тоном, более живым и личным',
+      fb_facts:    'Нет конкретики — добавь факты, цифры, реальные примеры',
+      fb_ads:      'Слишком рекламно и агрессивно — сделай мягче, больше пользы читателю',
+      fb_angle:    'Не та идея — возьми другой угол зрения, другую историю, другой заход',
+      fb_boring:   'Скучно и банально — сделай живее, добавь неожиданный поворот или эмоцию',
+      fb_title:    'Заголовок слабый — придумай более цепляющий и конкретный',
+      fb_audience: 'Не попадает в мою аудиторию — перепиши с фокусом на их реальные боли',
+      fb_engage:   'Нет вовлечения — добавь сильный вопрос или интригу чтобы захотелось ответить'
     };
 
     if (data === 'fb_custom') {
@@ -861,16 +866,17 @@ async function handleCallback(ctx) {
       return;
     }
 
-    const feedback = fbMap[data];
+    const feedback = fbMap[data] || 'Не понравилось — сделай принципиально другой вариант';
+    const regenCount = (state.regen_count || 0) + 1;
     await ctx.editMessageText('⚡️ Перегенерирую с учётом пожеланий...');
     try {
       const user = db.getUser(telegramId);
       const userData = buildUserData(user, state);
-      const newPost = await regeneratePost(state.current_post_type, userData, feedback);
+      const newPost = await regeneratePost(state.current_post_type, userData, feedback, regenCount);
       const genId = db.saveGeneration(telegramId, state.current_post_type, userData.topic, userData.social_network, newPost);
-      setState(telegramId, { current_gen_id: genId, regen_count: (state.regen_count || 0) + 1 });
+      setState(telegramId, { current_gen_id: genId, regen_count: regenCount });
       await ctx.reply(
-        `📝 *${state.current_post_type.toUpperCase()}* (новый вариант)\n\n${newPost}\n\n⭐️ Оцени:`,
+        `📝 *${state.current_post_type.toUpperCase()}* (вариант ${regenCount + 1})\n\n${newPost}\n\n⭐️ Оцени:`,
         { parse_mode: 'Markdown', ...kb.ratingKeyboard(genId) }
       );
     } catch (e) {
