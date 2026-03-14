@@ -45,16 +45,18 @@ const interestsList = [
   { text: '🚗 Авто, недвижимость', cb: 'int_auto' }
 ];
 
-function buildInterestsKeyboard(selected = []) {
+function buildInterestsKeyboard(selected = [], frozen = false) {
   const buttons = interestsList.map(item => {
     const isSelected = selected.includes(item.cb);
     return [Markup.button.callback(
       (isSelected ? '✅ ' : '') + item.text,
-      item.cb
+      frozen ? 'noop' : item.cb  // если frozen — все кнопки неактивны
     )];
   });
-  buttons.push([Markup.button.callback('— — — — — — — — —', 'noop')]);
-  buttons.push([Markup.button.callback('🟢 ГОТОВО — продолжить →', 'interests_done')]);
+  if (!frozen) {
+    buttons.push([Markup.button.callback('— — — — — — — — —', 'noop')]);
+    buttons.push([Markup.button.callback('🟢 ГОТОВО — продолжить →', 'interests_done')]);
+  }
   return Markup.inlineKeyboard(buttons);
 }
 
