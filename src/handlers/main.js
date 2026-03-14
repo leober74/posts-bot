@@ -115,6 +115,17 @@ async function handleTextInput(ctx) {
 
   // Ввод другой соцсети
   if (step === 'ask_social_other') {
+    const lower = text.toLowerCase();
+
+    // YouTube и TikTok — не текстовые платформы
+    if (lower.includes('youtube') || lower.includes('ютуб') || lower.includes('tiktok') || lower.includes('тикток')) {
+      await ctx.reply(
+        `На ${text} публикуют видео, а не текстовые посты 🎬\n\nЯ специализируюсь на текстовых постах. Выбери соцсеть где будешь их публиковать — например Telegram, ВКонтакте или Instagram:`,
+        kb.socialKeyboard
+      );
+      return;
+    }
+
     db.updateUser(telegramId, { social_network: text });
     setState(telegramId, { social_network: text });
     await ctx.reply(
@@ -705,7 +716,7 @@ async function handleCallback(ctx) {
 
     if (data === 'sn_other') {
       // Просим ввести название соцсети текстом
-      await ctx.editMessageText('Напиши название своей соцсети или платформы (например: YouTube, TikTok, LinkedIn):');
+      await ctx.editMessageText('Напиши название своей соцсети (например: LinkedIn, Одноклассники, Pinterest, Дзен):');
       setStep(telegramId, 'ask_social_other');
       return;
     }
