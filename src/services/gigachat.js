@@ -137,14 +137,25 @@ async function generatePost(postType, userData, regenCount = 0) {
 async function regeneratePost(postType, userData, feedback, regenCount = 1) {
   const token = await getAccessToken();
   const basePrompt = buildPrompt(postType, userData, regenCount);
-  const fullPrompt = `${basePrompt}\n\nВАЖНО: Предыдущий вариант не подошёл. Причина: "${feedback}".\nНапиши ПРИНЦИПИАЛЬНО ДРУГОЙ вариант — другое начало, другой угол подачи, другие примеры. Не повторяй предыдущую структуру.`;
+
+  // Фидбек пользователя становится ГЛАВНЫМ требованием — ставим его в начало
+  const fullPrompt = `ГЛАВНОЕ ТРЕБОВАНИЕ КОТОРОЕ НЕЛЬЗЯ ИГНОРИРОВАТЬ:
+Пользователь посмотрел предыдущий вариант и сказал: "${feedback}"
+
+Это не пожелание — это обязательное условие. Если написано "нужны цифры" — в посте ДОЛЖНЫ быть конкретные цифры. Если написано "сделай короче" — пост ДОЛЖЕН быть короче. Если написано "другой тон" — тон ДОЛЖЕН измениться. Выполни это требование точно и буквально.
+
+Теперь напиши новый пост по следующим параметрам:
+
+${basePrompt}
+
+Проверь себя перед ответом: требование "${feedback}" выполнено? Если нет — перепиши.`;
 
   const response = await axios.post(
     'https://gigachat.devices.sberbank.ru/api/v1/chat/completions',
     {
       model: 'GigaChat',
       messages: [{ role: 'user', content: fullPrompt }],
-      temperature: 0.9 + (regenCount * 0.05),
+      temperature: 0.85,
       max_tokens: 1000
     },
     {
