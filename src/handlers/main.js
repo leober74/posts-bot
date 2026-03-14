@@ -665,8 +665,14 @@ async function handleCallback(ctx) {
     db.addUsedTopic(telegramId, autoTopic);
     setState(telegramId, { interests: interestLabels, topic: autoTopic });
 
+    // Показываем выбранное
+    const selectedText = selected.map(cb => {
+      const item = kb.interestsList.find(i => i.cb === cb);
+      return item ? `✅ ${item.text}` : cb;
+    }).join('\n');
+
     await ctx.editMessageText(
-      `✅ Отлично, запомнил!\n\nДля какой соцсети готовим посты?`,
+      `Выбрано:\n${selectedText}\n\nДля какой соцсети готовим посты?`,
       kb.socialKeyboard
     );
     setStep(telegramId, 'ask_social');
@@ -689,7 +695,12 @@ async function handleCallback(ctx) {
 
     db.addUsedTopic(telegramId, topicLabel);
     setState(telegramId, { topic: topicLabel });
-    await ctx.editMessageText('Для какой соцсети готовим посты?', kb.socialKeyboard);
+
+    // Показываем что выбрано — отмечаем галочкой
+    await ctx.editMessageText(
+      `Тема выбрана: ✅ *${topicLabel}*\n\nДля какой соцсети готовим посты?`,
+      { parse_mode: 'Markdown', ...kb.socialKeyboard }
+    );
     setStep(telegramId, 'ask_social');
     return;
   }
