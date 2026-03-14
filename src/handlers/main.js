@@ -665,16 +665,10 @@ async function handleCallback(ctx) {
     db.addUsedTopic(telegramId, autoTopic);
     setState(telegramId, { interests: interestLabels, topic: autoTopic });
 
-    // Показываем выбранное
-    const selectedText = selected.map(cb => {
-      const item = kb.interestsList.find(i => i.cb === cb);
-      return item ? `✅ ${item.text}` : cb;
-    }).join('\n');
+    // Замораживаем клавиатуру — выбранные с ✅, все становятся noop
+    await ctx.editMessageReplyMarkup(kb.buildInterestsKeyboard(selected, true).reply_markup);
 
-    await ctx.editMessageText(
-      `Выбрано:\n${selectedText}\n\nДля какой соцсети готовим посты?`,
-      kb.socialKeyboard
-    );
+    await ctx.reply('Для какой соцсети готовим посты?', kb.socialKeyboard);
     setStep(telegramId, 'ask_social');
     return;
   }
@@ -696,11 +690,23 @@ async function handleCallback(ctx) {
     db.addUsedTopic(telegramId, topicLabel);
     setState(telegramId, { topic: topicLabel });
 
-    // Показываем что выбрано — отмечаем галочкой
-    await ctx.editMessageText(
-      `Тема выбрана: ✅ *${topicLabel}*\n\nДля какой соцсети готовим посты?`,
-      { parse_mode: 'Markdown', ...kb.socialKeyboard }
+    // Показываем кнопки с галочкой на выбранной, остальные — noop
+    const { Markup } = require('telegraf');
+    const frozenKeyboard = Markup.inlineKeyboard(
+      Object.entries(TOPIC_LABELS).map(([cb, label]) => [
+        Markup.button.callback(
+          label === topicLabel ? `✅ ${label}` : label,
+          label === topicLabel ? 'noop' : 'noop'
+        )
+      ])
     );
+
+    await ctx.editMessageText(
+      `Тема выбрана!\n\nДля какой соцсети готовим посты?`,
+      { ...frozenKeyboard }
+    );
+
+    await ctx.reply('Для какой соцсети готовим посты?', kb.socialKeyboard);
     setStep(telegramId, 'ask_social');
     return;
   }
