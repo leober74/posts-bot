@@ -50,7 +50,7 @@ function buildInterestsKeyboard(selected = [], frozen = false) {
     const isSelected = selected.includes(item.cb);
     const label = isSelected
       ? `✅ ${item.text}`
-      : frozen ? `　${item.text}` : `○ ${item.text}`;
+      : frozen ? item.text : `· ${item.text}`;
     return [Markup.button.callback(label, frozen ? 'noop' : item.cb)];
   });
   if (!frozen) {
