@@ -610,7 +610,7 @@ async function handleCallback(ctx) {
 
     if (state.user_type === 'personal') {
       await ctx.editMessageText(
-        'Выбери темы, которые тебе близки (можно несколько):',
+        'Что для тебя важно в жизни? (можно выбрать несколько)\n\nЭто поможет боту писать посты на твоём языке — про то что реально волнует тебя и твою аудиторию:',
         kb.buildInterestsKeyboard([])
       );
       setState(telegramId, { selected_interests: [] });
@@ -635,13 +635,24 @@ async function handleCallback(ctx) {
 
   if (data === 'interests_done') {
     const selected = state.selected_interests || [];
+
+    // Блокируем если ничего не выбрано
+    if (selected.length === 0) {
+      await ctx.answerCbQuery('👆 Выбери хотя бы одну тему!', { show_alert: true });
+      return;
+    }
+
     const interestLabels = selected.map(cb => {
       const item = kb.interestsList.find(i => i.cb === cb);
       return item ? item.text : cb;
     }).join(', ');
     db.updateUser(telegramId, { interests: interestLabels });
     setState(telegramId, { interests: interestLabels });
-    await ctx.editMessageText('Выбери тему для постов:', kb.topicsKeyboard);
+
+    await ctx.editMessageText(
+      `✅ Отлично, запомнил!\n\nТеперь выбери *тему* для постов.\n\nЭто о чём конкретно будем писать — например "Дополнительный доход" или "Здоровье". Бот сгенерирует 4 поста именно по этой теме:`,
+      { parse_mode: 'Markdown', ...kb.topicsKeyboard }
+    );
     setStep(telegramId, 'ask_topic');
     return;
   }
