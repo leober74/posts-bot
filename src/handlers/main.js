@@ -1,4 +1,4 @@
-const { getState, setState, setStep, getStep } = require('../services/state');
+const { getState, setState, clearState, setStep, getStep } = require('../services/state');
 const db = require('../models/db');
 const { generatePost, regeneratePost } = require('../services/gigachat');
 const kb = require('../utils/keyboards');
@@ -41,6 +41,9 @@ async function handleStart(ctx) {
 
   db.createUser(telegramId, username);
   db.updateUser(telegramId, { segment });
+
+  // Сбрасываем состояние — начинаем чистый диалог
+  clearState(telegramId);
   setState(telegramId, { segment });
 
   // Если сегмент noshop — сначала спрашиваем фильтрующий вопрос
