@@ -5,6 +5,33 @@ const kb = require('../utils/keyboards');
 
 const POST_TYPES = ['продающий', 'развлекательный', 'экспертный', 'вовлекающий'];
 
+// ─── Определение пола по имени ────────────────────────────
+function detectGender(name) {
+  if (!name) return 'Не указан';
+  const n = name.trim().toLowerCase().split(' ')[0]; // берём только первое слово
+
+  const male = ['александр','алексей','андрей','антон','артём','артем','борис','вадим','валентин',
+    'василий','виктор','виталий','владимир','владислав','вячеслав','геннадий','георгий','григорий',
+    'даниил','daniel','денис','дмитрий','евгений','иван','игорь','илья','кирилл','константин',
+    'леонид','максим','михаил','никита','николай','олег','павел','пётр','петр','роман','руслан',
+    'сергей','степан','тимур','фёдор','федор','филипп','юрий','яков','ярослав','глеб','лев',
+    'марк','матвей','мирон','платон','савелий','тихон','арсений','всеволод','святослав'];
+
+  const female = ['александра','алина','алиса','алла','анастасия','анна','валентина','валерия',
+    'вера','виктория','галина','дарья','диана','екатерина','елена','елизавета','жанна','ирина',
+    'карина','кристина','ксения','лариса','лидия','людмила','маргарита','марина','мария','надежда',
+    'наталья','наталия','нина','оксана','ольга','полина','светлана','софья','софия','тамара',
+    'татьяна','ульяна','юлия','яна','вероника','евгения','жанна','зинаида','зоя','инна','лилия',
+    'милана','мила','регина','рита','снежана','эвелина','эллина'];
+
+  if (male.includes(n)) return 'Мужской';
+  if (female.includes(n)) return 'Женский';
+
+  // По окончанию имени если не нашли в списке
+  if (n.endsWith('а') || n.endsWith('я') || n.endsWith('ия')) return 'Женский';
+  return 'Мужской'; // по умолчанию
+}
+
 const TOPIC_LABELS = {
   topic_economy: 'Экономия и скидки',
   topic_income: 'Дополнительный доход',
@@ -93,8 +120,9 @@ async function handleTextInput(ctx) {
   if (!step) return;
 
   if (step === 'ask_name') {
-    db.updateUser(telegramId, { name: text });
-    setState(telegramId, { name: text });
+    const gender = detectGender(text);
+    db.updateUser(telegramId, { name: text, gender });
+    setState(telegramId, { name: text, gender });
     await ctx.reply(`Приятно познакомиться, ${text}! 👋\n\nСколько тебе лет?`, kb.ageKeyboard);
     setStep(telegramId, 'ask_age');
     return;
@@ -609,18 +637,9 @@ async function handleCallback(ctx) {
       age_under18: 'до 18', age_18_25: '18–25', age_26_35: '26–35',
       age_36_45: '36–45', age_46_60: '46–60', age_60plus: '60+'
     };
-    db.updateUser(telegramId, { age: ageMap[data] });
-    setState(telegramId, { age: ageMap[data] });
-    await ctx.editMessageText('Укажи пол:', kb.genderKeyboard);
-    setStep(telegramId, 'ask_gender');
-    return;
-  }
-
-  // Пол
-  if (data.startsWith('gender_')) {
-    const gender = data === 'gender_male' ? 'Мужской' : 'Женский';
-    db.updateUser(telegramId, { gender });
-    setState(telegramId, { gender });
+    const age = ageMap[data];
+    db.updateUser(telegramId, { age });
+    setState(telegramId, { age });
 
     if (state.user_type === 'personal') {
       await ctx.editMessageText(
@@ -631,6 +650,25 @@ async function handleCallback(ctx) {
       setStep(telegramId, 'ask_interests');
     } else {
       await ctx.editMessageText('Расскажи о своём бизнесе: что продаёшь, кто клиенты, как часто покупают?\n\n(напиши в свободной форме)');
+      setStep(telegramId, 'ask_business_desc');
+    }
+    return;
+  }
+
+  // Пол (оставляем на случай если понадобится в будущем, но не показываем)
+  if (data.startsWith('gender_')) {
+    const gender = data === 'gender_male' ? 'Мужской' : 'Женский';
+    db.updateUser(telegramId, { gender });
+    setState(telegramId, { gender });
+    if (state.user_type === 'personal') {
+      await ctx.editMessageText(
+        'Что для тебя важно в жизни? (можно выбрать несколько)\n\nЭто поможет боту писать посты на твоём языке:',
+        kb.buildInterestsKeyboard([])
+      );
+      setState(telegramId, { selected_interests: [] });
+      setStep(telegramId, 'ask_interests');
+    } else {
+      await ctx.editMessageText('Расскажи о своём бизнесе:');
       setStep(telegramId, 'ask_business_desc');
     }
     return;
