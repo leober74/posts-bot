@@ -5,6 +5,15 @@ const kb = require('../utils/keyboards');
 
 const POST_TYPES = ['продающий', 'развлекательный', 'экспертный', 'вовлекающий'];
 
+// ─── Форматирование поста — первая строка жирная ──────────
+function formatPost(post) {
+  if (!post) return post;
+  const lines = post.split('\n');
+  const firstLine = lines[0].replace(/\*/g, '').trim();
+  const rest = lines.slice(1).join('\n');
+  return `*${firstLine}*\n${rest}`;
+}
+
 // ─── Определение пола по имени ────────────────────────────
 function detectGender(name) {
   if (!name) return 'Не указан';
@@ -939,7 +948,7 @@ async function handleCallback(ctx) {
       const genId = db.saveGeneration(telegramId, state.current_post_type, userData.topic, userData.social_network, newPost);
       setState(telegramId, { current_gen_id: genId, regen_count: regenCount });
       await ctx.reply(
-        `📝 *${state.current_post_type.toUpperCase()}* (вариант ${regenCount + 1})\n\n${newPost}\n\n⭐️ Оцени:`,
+        `📝 *${state.current_post_type.toUpperCase()}* (вариант ${regenCount + 1})\n\n${formatPost(newPost)}\n\n⭐️ Оцени:`,
         { parse_mode: 'Markdown', ...kb.ratingKeyboard(genId) }
       );
     } catch (e) {
@@ -1092,8 +1101,11 @@ async function generateNextPost(ctx, index) {
 
     await ctx.telegram.deleteMessage(telegramId, loadingMsg.message_id).catch(() => {});
 
+    // Делаем первую строку жирной
+    const formattedPost = formatPost(post);
+
     await ctx.reply(
-      `📝 *Пост ${index + 1} из 4 — ${postType.toUpperCase()}*\n\n${post}\n\n⭐️ Оцени пост:`,
+      `📝 *Пост ${index + 1} из 4 — ${postType.toUpperCase()}*\n\n${formattedPost}\n\n⭐️ Оцени пост:`,
       { parse_mode: 'Markdown', ...kb.ratingKeyboard(genId) }
     );
   } catch (e) {
