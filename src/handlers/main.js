@@ -716,7 +716,7 @@ async function handleCallback(ctx) {
 
     if (data === 'sn_other') {
       // Просим ввести название соцсети текстом
-      await ctx.editMessageText('Напиши название своей соцсети (например: LinkedIn, Одноклассники, Pinterest, Дзен):');
+      await ctx.editMessageText('Напиши название своей соцсети (например: Одноклассники, LinkedIn, Дзен, Threads):');
       setStep(telegramId, 'ask_social_other');
       return;
     }
