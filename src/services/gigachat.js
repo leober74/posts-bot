@@ -24,7 +24,10 @@ async function getAccessToken() {
   );
 
   accessToken = response.data.access_token;
-  tokenExpiry = Date.now() + (response.data.expires_at - 60) * 1000;
+  // expires_at приходит в миллисекундах, обновляем за 2 минуты до истечения
+  tokenExpiry = response.data.expires_at
+    ? response.data.expires_at - 120000
+    : Date.now() + 28 * 60 * 1000; // fallback: 28 минут
   return accessToken;
 }
 
