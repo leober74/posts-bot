@@ -101,14 +101,25 @@ function ratingKeyboard(genId) {
 }
 
 function feedbackKeyboard() {
-  return Markup.inlineKeyboard([
-    [Markup.button.callback('📏 Слишком длинно — сократи', 'fb_long')],
-    [Markup.button.callback('🎨 Не мой стиль — другой тон', 'fb_style')],
-    [Markup.button.callback('📊 Нет конкретики — добавь факты', 'fb_facts')],
-    [Markup.button.callback('📢 Слишком рекламно — помягче', 'fb_ads')],
-    [Markup.button.callback('💡 Не та идея — другой угол', 'fb_angle')],
-    [Markup.button.callback('✏️ Объясню сам что изменить', 'fb_custom')]
-  ]);
+  // Полный пул вариантов
+  const pool = [
+    { text: '📏 Слишком длинно — сократи', cb: 'fb_long' },
+    { text: '📝 Слишком коротко — раскрой', cb: 'fb_short' },
+    { text: '🎨 Не мой стиль — другой тон', cb: 'fb_style' },
+    { text: '📊 Нет конкретики — добавь факты', cb: 'fb_facts' },
+    { text: '📢 Слишком рекламно — помягче', cb: 'fb_ads' },
+    { text: '💡 Не та идея — другой угол', cb: 'fb_angle' },
+    { text: '🔥 Скучно — сделай живее', cb: 'fb_boring' },
+    { text: '😐 Заголовок слабый — придумай лучше', cb: 'fb_title' },
+    { text: '🎯 Не про мою аудиторию — перепиши', cb: 'fb_audience' },
+    { text: '💬 Нет вовлечения — добавь вопрос', cb: 'fb_engage' },
+  ];
+
+  // Перемешиваем и берём 5 случайных + всегда оставляем "объясню сам"
+  const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 5);
+  const buttons = shuffled.map(item => [Markup.button.callback(item.text, item.cb)]);
+  buttons.push([Markup.button.callback('✏️ Объясню сам что изменить', 'fb_custom')]);
+  return Markup.inlineKeyboard(buttons);
 }
 
 function publishGuideKeyboard(genId, socialNetwork) {
