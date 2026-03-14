@@ -43,6 +43,10 @@ bot.catch((err, ctx) => {
 bot.launch()
   .then(() => console.log('🤖 Бот запущен!'))
   .catch(err => {
+    if (err.message && err.message.includes('409')) {
+      console.error('⚠️ Уже запущен другой экземпляр бота (409). Останавливаемся.');
+      process.exit(0); // exit(0) = не ошибка, Railway не перезапустит
+    }
     console.error('Ошибка запуска:', err.message);
     process.exit(1);
   });
