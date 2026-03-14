@@ -647,7 +647,6 @@ async function handleCallback(ctx) {
   if (data === 'interests_done') {
     const selected = state.selected_interests || [];
 
-    // Блокируем если ничего не выбрано
     if (selected.length === 0) {
       await ctx.answerCbQuery('👆 Выбери хотя бы одну тему!', { show_alert: true });
       return;
@@ -657,14 +656,20 @@ async function handleCallback(ctx) {
       const item = kb.interestsList.find(i => i.cb === cb);
       return item ? item.text : cb;
     }).join(', ');
+
+    // Берём первый интерес как тему для генерации
+    const firstInterest = kb.interestsList.find(i => i.cb === selected[0]);
+    const autoTopic = firstInterest ? firstInterest.text : interestLabels;
+
     db.updateUser(telegramId, { interests: interestLabels });
-    setState(telegramId, { interests: interestLabels });
+    db.addUsedTopic(telegramId, autoTopic);
+    setState(telegramId, { interests: interestLabels, topic: autoTopic });
 
     await ctx.editMessageText(
-      `✅ Отлично, запомнил!\n\nТеперь выбери *тему* для постов.\n\nЭто о чём конкретно будем писать — например "Дополнительный доход" или "Здоровье". Бот сгенерирует 4 поста именно по этой теме:`,
-      { parse_mode: 'Markdown', ...kb.topicsKeyboard }
+      `✅ Отлично, запомнил!\n\nДля какой соцсети готовим посты?`,
+      kb.socialKeyboard
     );
-    setStep(telegramId, 'ask_topic');
+    setStep(telegramId, 'ask_social');
     return;
   }
 
