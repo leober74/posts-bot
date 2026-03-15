@@ -149,7 +149,7 @@ async function handleTextInput(ctx) {
   if (step === 'ask_business_desc') {
     db.updateUser(telegramId, { business_desc: text });
     setState(telegramId, { business_desc: text });
-    await ctx.reply('Как часто клиенты покупают у вас?', kb.purchaseFreqKeyboard);
+    await ctx.reply('Как часто клиенты покупают у тебя?', kb.purchaseFreqKeyboard);
     setStep(telegramId, 'ask_purchase_freq');
     return;
   }
@@ -318,7 +318,7 @@ async function handleTextInput(ctx) {
   if (step === 'interview_problem') {
     setState(telegramId, { interview_problem: text });
     await ctx.reply(
-      '3️⃣ *Пробовали ли вы уже привлекать партнёров или агентов для продаж?*\n\nЕсли да — что получилось? Если нет — почему не пробовали?',
+      '3️⃣ *Пробовал ли ты уже привлекать партнёров или агентов для продаж?*\n\nЕсли да — что получилось? Если нет — почему не пробовали?',
       { parse_mode: 'Markdown' }
     );
     setStep(telegramId, 'interview_tried');
@@ -328,7 +328,7 @@ async function handleTextInput(ctx) {
   if (step === 'interview_tried') {
     setState(telegramId, { interview_tried: text });
     await ctx.reply(
-      '4️⃣ *Вопрос про цену платформы:*\n\nПри каком ценнике в месяц вы бы *точно купили* доступ к платформе для управления партнёрской сетью?\n\n_(выбери один вариант)_',
+      '4️⃣ *Вопрос про цену платформы:*\n\nПри каком ценнике в месяц ты бы *точно купил* доступ к платформе для управления партнёрской сетью?\n\n_(выбери один вариант)_',
       { parse_mode: 'Markdown', ...kb.wtpYesKeyboard }
     );
     setStep(telegramId, 'interview_wtp_yes');
@@ -369,7 +369,7 @@ async function handleTextInput(ctx) {
 
     // Переходим к квалификации
     await ctx.reply(
-      '✅ *Ваш бизнес оформлен юридически (ИП или ООО)?*',
+      '✅ *Твой бизнес оформлен юридически (ИП или ООО)?*',
       { parse_mode: 'Markdown', ...kb.qualLegalKeyboard }
     );
     setStep(telegramId, 'qual_legal');
@@ -492,7 +492,7 @@ async function handleCallback(ctx) {
   if (data === 'interview_skip') {
     // Пропустили интервью — сразу к квалификации
     await ctx.editMessageText(
-      '✅ *Ваш бизнес оформлен юридически (ИП или ООО)?*',
+      '✅ *Твой бизнес оформлен юридически (ИП или ООО)?*',
       { parse_mode: 'Markdown', ...kb.qualLegalKeyboard }
     );
     setStep(telegramId, 'qual_legal');
@@ -505,7 +505,7 @@ async function handleCallback(ctx) {
     const labels = { '5k': 'до 5 000 ₽', '15k': '5 000–15 000 ₽', '30k': '15 000–30 000 ₽', '75k': '30 000–75 000 ₽', '75kplus': '75 000+ ₽' };
     setState(telegramId, { wtp_yes: labels[val] });
     await ctx.editMessageText(
-      `✅ Записал!\n\nПри каком ценнике вы бы *подумали* — возможно купили бы?`,
+      `✅ Записал!\n\nПри каком ценнике ты бы *подумал* — возможно купили бы?`,
       { parse_mode: 'Markdown', ...kb.wtpMaybeKeyboard }
     );
     setStep(telegramId, 'interview_wtp_maybe');
@@ -518,7 +518,7 @@ async function handleCallback(ctx) {
     const labels = { '5k': 'до 5 000 ₽', '15k': '5 000–15 000 ₽', '30k': '15 000–30 000 ₽', '75k': '30 000–75 000 ₽', '75kplus': '75 000+ ₽' };
     setState(telegramId, { wtp_maybe: labels[val] });
     await ctx.editMessageText(
-      `Понял!\n\nПри каком ценнике вы бы *точно отказались*?`,
+      `Понял!\n\nПри каком ценнике ты бы *точно отказался*?`,
       { parse_mode: 'Markdown', ...kb.wtpNoKeyboard }
     );
     setStep(telegramId, 'interview_wtp_no');
@@ -531,7 +531,7 @@ async function handleCallback(ctx) {
     const labels = { '5k': 'до 5 000 ₽', '15k': '5 000–15 000 ₽', '30k': '15 000–30 000 ₽', '75k': '30 000–75 000 ₽', '75kplus': '75 000+ ₽' };
     setState(telegramId, { wtp_no: labels[val] });
     await ctx.editMessageText(
-      '5️⃣ *Последний вопрос — NPS:*\n\nС какой вероятностью от 0 до 10 вы порекомендуете нашу платформу коллеге-предпринимателю?\n\n_0 — точно не порекомендую, 10 — точно порекомендую_',
+      '5️⃣ *Последний вопрос — NPS:*\n\nС какой вероятностью от 0 до 10 ты порекомендуешь нашу платформу коллеге-предпринимателю?\n\n_0 — точно не порекомендую, 10 — точно порекомендую_',
       { parse_mode: 'Markdown', ...kb.npsKeyboard() }
     );
     setStep(telegramId, 'interview_nps');
@@ -597,7 +597,7 @@ async function handleCallback(ctx) {
   if (data === 'qual_legal_yes') {
     setState(telegramId, { qual_legal: 'yes' });
     await ctx.editMessageText(
-      '✅ Отлично!\n\n*Клиенты покупают у вас повторно или платят по подписке?*',
+      '✅ Отлично!\n\n*Клиенты покупают у тебя повторно или платят по подписке?*',
       { parse_mode: 'Markdown', ...kb.qualRepeatKeyboard }
     );
     setStep(telegramId, 'qual_repeat');
@@ -618,7 +618,7 @@ async function handleCallback(ctx) {
   if (data === 'qual_repeat_yes' || data === 'qual_repeat_mid' || data === 'qual_repeat_no') {
     setState(telegramId, { qual_repeat: data });
     await ctx.editMessageText(
-      '📊 *Примерный оборот вашего бизнеса в месяц?*',
+      '📊 *Примерный оборот твоего бизнеса в месяц?*',
       { parse_mode: 'Markdown', ...kb.qualRevenueKeyboard }
     );
     setStep(telegramId, 'qual_revenue');
@@ -635,7 +635,7 @@ async function handleCallback(ctx) {
       // Сильный бизнес — полная бизнес-ветка
       setState(telegramId, { qual_revenue: data, user_type: 'business' });
       await ctx.editMessageText(
-        '🚀 Отлично! У вас зрелый бизнес с потенциалом для партнёрской сети.\n\nЯ помогу создать посты которые привлекут сильных партнёров — владельцев своих каналов продаж.\n\nКак вас зовут?'
+        '🚀 Отлично! У тебя зрелый бизнес с потенциалом для партнёрской сети.\n\nЯ помогу создать посты которые привлекут сильных партнёров — владельцев своих каналов продаж.\n\nКак тебя зовут?'
       );
     } else {
       // Слабые показатели — переводим в личный бренд
@@ -777,7 +777,7 @@ async function handleCallback(ctx) {
       pf_monthly: 'Ежемесячная подписка', pf_other: 'Другое'
     };
     db.updateUser(telegramId, { purchase_freq: pfMap[data] });
-    await ctx.editMessageText('Планируете привлекать партнёров (агентов) для продаж?', kb.partnersKeyboard);
+    await ctx.editMessageText('Планируешь привлекать партнёров (агентов) для продаж?', kb.partnersKeyboard);
     setStep(telegramId, 'ask_partners');
     return;
   }
@@ -884,7 +884,7 @@ async function handleCallback(ctx) {
 
       // Инструкция по публикации
       const guides = {
-        'ВКонтакте': '📋 *Как опубликовать во ВКонтакте:*\n1. Скопируй текст поста выше (зажми → Копировать)\n2. Открой ВКонтакте → нажми "Что у вас нового?"\n3. Вставь текст\n4. Добавь фото по желанию\n5. Нажми "Опубликовать" ✅',
+        'ВКонтакте': '📋 *Как опубликовать во ВКонтакте:*\n1. Скопируй текст поста выше (зажми → Копировать)\n2. Открой ВКонтакте → нажми "Что у меня нового?"\n3. Вставь текст\n4. Добавь фото по желанию\n5. Нажми "Опубликовать" ✅',
         'Telegram': '📋 *Как опубликовать в Telegram:*\n1. Скопируй текст поста выше\n2. Открой свой канал или группу\n3. Нажми на поле сообщения → вставь текст\n4. Нажми отправить ✅\n\n💡 *Совет:* для форматирования используй **жирный** и _курсив_',
         'Instagram': '📋 *Как опубликовать в Instagram:*\n1. Скопируй текст поста выше\n2. Открой Instagram → нажми + (новая публикация)\n3. Выбери фото или Reels\n4. В поле "Подпись" вставь текст\n5. Нажми "Поделиться" ✅\n\n💡 *Совет:* Instagram режет текст — первые 2 строки самые важные!'
       };
@@ -1143,7 +1143,7 @@ async function showFinalScreen(ctx) {
     );
   } else {
     await ctx.reply(
-      `🔥 Все 4 поста готовы!\n\nХотите получать такие посты регулярно по всем темам?`,
+      `🔥 Все 4 поста готовы!\n\nХочешь получать такие посты регулярно по всем темам?`,
       kb.finalKeyboard
     );
   }
