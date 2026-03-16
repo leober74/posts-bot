@@ -48,15 +48,9 @@ const interestsList = [
 function buildInterestsKeyboard(selected = [], frozen = false) {
   const buttons = interestsList.map(item => {
     const isSelected = selected.includes(item.cb);
-    const label = isSelected
-      ? `✅ ${item.text}`
-      : frozen ? item.text : `· ${item.text}`;
+    const label = isSelected ? `✅ ${item.text}` : item.text;
     return [Markup.button.callback(label, frozen ? 'noop' : item.cb)];
   });
-  if (!frozen) {
-    buttons.push([Markup.button.callback('— — — — — — — — —', 'noop')]);
-    buttons.push([Markup.button.callback('🟢 ГОТОВО — продолжить →', 'interests_done')]);
-  }
   return Markup.inlineKeyboard(buttons);
 }
 
