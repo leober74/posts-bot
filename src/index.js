@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { Telegraf } = require('telegraf');
+const express = require('express');
 const fs = require('fs');
 const path = require('path');
 
@@ -9,10 +10,36 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 const db = require('./models/db');
 const handlers = require('./handlers/main');
+const { handlePaymentWebhook } = require('./services/payment');
 
 db.initDB();
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
+
+// ─── Express для webhook ───────────────────────────────────
+const app = express();
+app.use(express.text({ type: '*/*' }));
+
+app.post('/payment/callback', async (req, res) => {
+  console.log('💳 Входящий webhook от Точки');
+  try {
+    const jwtToken = typeof req.body === 'string' ? req.body.trim() : '';
+    if (!jwtToken) {
+      console.error('Webhook: пустое тело');
+      return res.status(400).send('Bad Request');
+    }
+    await handlePaymentWebhook(bot, jwtToken);
+    res.status(200).send('OK');
+  } catch (e) {
+    console.error('Webhook error:', e.message);
+    res.status(500).send('Error');
+  }
+});
+
+app.get('/health', (req, res) => res.send('OK'));
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🌐 Webhook сервер запущен на порту ${PORT}`));
 
 // ─── Команды ──────────────────────────────────────────────
 bot.start(handlers.handleStart);
@@ -45,7 +72,7 @@ bot.launch()
   .catch(err => {
     if (err.message && err.message.includes('409')) {
       console.error('⚠️ Уже запущен другой экземпляр бота (409). Останавливаемся.');
-      process.exit(0); // exit(0) = не ошибка, Railway не перезапустит
+      process.exit(0);
     }
     console.error('Ошибка запуска:', err.message);
     process.exit(1);
