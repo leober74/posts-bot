@@ -1153,7 +1153,11 @@ async function generateNextPost(ctx, index) {
   } catch (e) {
     console.error('Ошибка генерации:', e.message);
     await ctx.telegram.deleteMessage(telegramId, loadingMsg.message_id).catch(() => {});
-    await ctx.reply('❌ Ошибка при обращении к AI. Проверь ключи API или попробуй позже.\n/start — начать заново');
+    const { Markup } = require('telegraf');
+    await ctx.reply(
+      '⚠️ GigaChat не ответил — попробуй ещё раз',
+      Markup.inlineKeyboard([[Markup.button.callback(`🔄 Попробовать ещё раз`, `next_${index}`)]])
+    );
   }
 }
 
