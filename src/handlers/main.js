@@ -187,10 +187,22 @@ async function handleTextInput(ctx) {
 
   // Главный вопрос — о чём пост
   if (step === 'ask_post_idea') {
+    // Проверяем что ответ осмысленный — минимум 3 слова или 10 символов
+    const words = text.split(/\s+/).filter(w => w.length > 1);
+    const isMeaningless = text.length < 10 || words.length < 2;
+
+    if (isMeaningless) {
+      await ctx.reply(
+        `Напиши чуть подробнее 😊\n\nНапример: _"хочу рассказать как начал своё дело"_ или _"ищу партнёров для бизнеса по доставке"_\n\nЧем конкретнее — тем точнее получится пост 🎯`,
+        { parse_mode: 'Markdown', ...kb.skipKeyboard }
+      );
+      return;
+    }
+
     db.updateUser(telegramId, { keywords: text });
     setState(telegramId, { keywords: text, post_idea: text });
     await ctx.reply(
-      '🔥 Отлично! Теперь пришли ссылку на свою страницу в соцсети — посмотрю как ты уже пишешь (необязательно):',
+      '👍 Отлично! Теперь пришли ссылку на свою страницу в соцсети — посмотрю как ты уже пишешь (необязательно):',
       kb.skipKeyboard
     );
     setStep(telegramId, 'ask_profile');
@@ -201,7 +213,7 @@ async function handleTextInput(ctx) {
     db.updateUser(telegramId, { keywords: text });
     setState(telegramId, { keywords: text });
     await ctx.reply(
-      '🔥 Отлично! Теперь пришли ссылку на свою страницу в соцсети (необязательно):',
+      '👍 Принял! Теперь пришли ссылку на свою страницу в соцсети (необязательно):',
       kb.skipKeyboard
     );
     setStep(telegramId, 'ask_profile');
