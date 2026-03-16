@@ -991,6 +991,10 @@ async function handleCallback(ctx) {
 
   // Финальные кнопки
   if (data === 'subscribe') {
+    const { createPaymentLink } = require('./services/payment') ;
+    const payLink = await createPaymentLink(telegramId) ||
+      'https://checkout.tochka.com/09495d68-9066-4f07-8349-fe75292f7b86';
+
     await ctx.editMessageText(
       '💎 *Подписка 100 руб/мес*\n\n' +
       'Включает:\n' +
@@ -1004,7 +1008,7 @@ async function handleCallback(ctx) {
       {
         parse_mode: 'Markdown',
         ...require('telegraf').Markup.inlineKeyboard([
-          [require('telegraf').Markup.button.url('💳 Оплатить 100 руб', 'https://checkout.tochka.com/09495d68-9066-4f07-8349-fe75292f7b86')],
+          [require('telegraf').Markup.button.url('💳 Оплатить 100 руб', payLink)],
           [require('telegraf').Markup.button.url('💬 Задать вопрос', 'https://t.me/leonid.berenshtein')]
         ])
       }
