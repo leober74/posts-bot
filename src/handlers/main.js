@@ -877,7 +877,7 @@ async function handleCallback(ctx) {
       await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
 
       const approvedMsg = rating === 5
-        ? '🔥 Огонь! Это именно то что нужно!'
+        ? '✅ Отличный пост — готов к публикации!'
         : '😊 Отлично! Пост готов к публикации.';
 
       await ctx.reply(approvedMsg);
@@ -888,7 +888,7 @@ async function handleCallback(ctx) {
         'Telegram': '📋 *Как опубликовать в Telegram:*\n1. Скопируй текст поста выше\n2. Открой свой канал или группу\n3. Нажми на поле сообщения → вставь текст\n4. Нажми отправить ✅\n\n💡 *Совет:* для форматирования используй **жирный** и _курсив_',
         'Instagram': '📋 *Как опубликовать в Instagram:*\n1. Скопируй текст поста выше\n2. Открой Instagram → нажми + (новая публикация)\n3. Выбери фото или Reels\n4. В поле "Подпись" вставь текст\n5. Нажми "Поделиться" ✅\n\n💡 *Совет:* Instagram режет текст — первые 2 строки самые важные!'
       };
-      const guide = guides[socialNetwork] || '📋 Скопируй текст поста и вставь в свою соцсеть. Первые 2 строки — самые важные!';
+      const guide = guides[socialNetwork] || '📋 Скопируй текст поста и вставь в свою соцсеть.';
       await ctx.reply(guide, { parse_mode: 'Markdown' });
 
       // NPS после первого одобренного поста у обычных пользователей
@@ -997,8 +997,22 @@ async function handleCallback(ctx) {
   // Финальные кнопки
   if (data === 'subscribe') {
     await ctx.editMessageText(
-      '💎 *Подписка 490 руб/мес*\n\nВключает:\n• Неограниченные генерации\n• Все темы\n• Приоритетная поддержка\n• A/B тестирование заголовков\n\n💳 Для оплаты напиши /pay или свяжись с @' + (process.env.ADMIN_USERNAME || 'admin'),
-      { parse_mode: 'Markdown' }
+      '💎 *Подписка 100 руб/мес*\n\n' +
+      'Включает:\n' +
+      '• Неограниченные генерации по всем темам\n' +
+      '• Повторная генерация уже использованных тем\n' +
+      '• Картинка к посту (AI-генерация)\n' +
+      '• A/B тестирование заголовков\n' +
+      '• Аналитика — какие посты получают больше отклика\n' +
+      '• Статистика заработка по реферальной программе\n' +
+      '• Приоритетная поддержка',
+      {
+        parse_mode: 'Markdown',
+        ...require('telegraf').Markup.inlineKeyboard([
+          [require('telegraf').Markup.button.url('💳 Оплатить 100 руб', 'https://checkout.tochka.com/09495d68-9066-4f07-8349-fe75292f7b86')],
+          [require('telegraf').Markup.button.url('💬 Задать вопрос', 'https://t.me/leonid.berenshtein')]
+        ])
+      }
     );
     return;
   }
@@ -1148,12 +1162,9 @@ async function showFinalScreen(ctx) {
     );
   }
 
-  // Реферальная ссылка — адаптированная под сегмент
-  const noshopLink = `https://t.me/${ctx.botInfo.username}?start=${user.referral_code}_noshop`;
+  // Реферальная ссылка
   await ctx.reply(
-    `🎁 *Реферальная программа*\n\nПриглашай друзей и получай *10%* от их оплаты!\n\n` +
-    `Обычная ссылка:\n\`${refLink}\`\n\n` +
-    `Ссылка для партнёров Shop (скрывает Shop-темы):\n\`${noshopLink}\``,
+    `🎁 *Реферальная программа*\n\nПриглашай друзей и получай *10%* от их оплаты!\n\nТвоя ссылка:\n\`${refLink}\``,
     { parse_mode: 'Markdown' }
   );
 }
