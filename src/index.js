@@ -10,7 +10,7 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 const db = require('./models/db');
 const handlers = require('./handlers/main');
-const { handlePaymentWebhook } = require('./services/payment');
+const { handlePaymentWebhook, registerWebhook } = require('./services/payment');
 
 db.initDB();
 
@@ -68,7 +68,12 @@ bot.catch((err, ctx) => {
 
 // ─── Запуск ───────────────────────────────────────────────
 bot.launch()
-  .then(() => console.log('🤖 Бот запущен!'))
+  .then(() => {
+    console.log('🤖 Бот запущен!');
+    // Регистрируем webhook Точки
+    const botUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN || 'web-production-e908a.up.railway.app'}`;
+    registerWebhook(botUrl);
+  })
   .catch(err => {
     if (err.message && err.message.includes('409')) {
       console.error('⚠️ Уже запущен другой экземпляр бота (409). Останавливаемся.');
