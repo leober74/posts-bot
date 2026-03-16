@@ -38,9 +38,6 @@ app.post('/payment/callback', async (req, res) => {
 
 app.get('/health', (req, res) => res.send('OK'));
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🌐 Webhook сервер запущен на порту ${PORT}`));
-
 // ─── Команды ──────────────────────────────────────────────
 bot.start(handlers.handleStart);
 bot.command('balance', handlers.handleBalance);
@@ -70,9 +67,14 @@ bot.catch((err, ctx) => {
 bot.launch()
   .then(() => {
     console.log('🤖 Бот запущен!');
-    // Регистрируем webhook Точки
-    const botUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN || 'web-production-e908a.up.railway.app'}`;
-    registerWebhook(botUrl);
+    // Запускаем Express после успешного старта бота
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+      console.log(`🌐 Webhook сервер запущен на порту ${PORT}`);
+      // Регистрируем webhook Точки
+      const botUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN || 'web-production-e908a.up.railway.app'}`;
+      registerWebhook(botUrl);
+    });
   })
   .catch(err => {
     if (err.message && err.message.includes('409')) {
