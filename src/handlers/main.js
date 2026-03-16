@@ -945,10 +945,17 @@ async function handleCallback(ctx) {
       const newPost = await regeneratePost(state.current_post_type, userData, feedback, regenCount);
       const genId = db.saveGeneration(telegramId, state.current_post_type, userData.topic, userData.social_network, newPost);
       setState(telegramId, { current_gen_id: genId, regen_count: regenCount });
-      await ctx.reply(
-        `📝 *${state.current_post_type.toUpperCase()}* (вариант ${regenCount + 1})\n\n${formatPost(newPost)}\n\n⭐️ Оцени:`,
+
+      // Удаляем предыдущий пост
+      if (state.current_post_msg_id) {
+        await ctx.telegram.deleteMessage(telegramId, state.current_post_msg_id).catch(() => {});
+      }
+
+      const postMsg = await ctx.reply(
+        `📝 *${state.current_post_type.toUpperCase()}* — вариант ${regenCount + 1}\n\n${formatPost(newPost)}\n\n⭐️ Оцени:`,
         { parse_mode: 'Markdown', ...kb.ratingKeyboard(genId) }
       );
+      setState(telegramId, { current_post_msg_id: postMsg.message_id });
     } catch (e) {
       console.error('Ошибка перегенерации:', e.message);
       const { Markup } = require('telegraf');
@@ -1121,10 +1128,12 @@ async function generateNextPost(ctx, index) {
     // Делаем первую строку жирной
     const formattedPost = formatPost(post);
 
-    await ctx.reply(
+    const postMsg = await ctx.reply(
       `📝 *Пост ${index + 1} из 4 — ${postType.toUpperCase()}*\n\n${formattedPost}\n\n⭐️ Оцени пост:`,
       { parse_mode: 'Markdown', ...kb.ratingKeyboard(genId) }
     );
+    // Сохраняем message_id чтобы удалить при перегенерации
+    setState(telegramId, { current_post_msg_id: postMsg.message_id });
   } catch (e) {
     console.error('Ошибка генерации:', e.message);
     await ctx.telegram.deleteMessage(telegramId, loadingMsg.message_id).catch(() => {});
@@ -1169,7 +1178,7 @@ async function showFinalScreen(ctx) {
     `• 50 → *500 руб/мес*\n` +
     `• 100 → *1 000 руб/мес*\n\n` +
     `Никаких продаж — просто публикуй посты как обычно.\n\n` +
-    `Твоя реферальная ссылка:\n\`${refLink}\``,
+    `Твоя реферальная ссылка (если захочешь просто её скопировать):\n${refLink}`,
     { parse_mode: 'Markdown' }
   );
 }
