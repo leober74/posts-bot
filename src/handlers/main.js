@@ -201,7 +201,7 @@ async function handleTextInput(ctx) {
     db.updateUser(telegramId, { keywords: text });
     setState(telegramId, { keywords: text, post_idea: text });
     await ctx.reply(
-      '👍 Отлично! Теперь пришли ссылку на свою страницу в соцсети — посмотрю как ты уже пишешь (необязательно):',
+      '👍 Принял!\n\nПоследний шаг — пришли ссылку на свою страницу в соцсети.\n\nЯ посмотрю как ты уже пишешь и подстрою стиль постов под тебя. Если страницы нет — просто пропусти:',
       kb.skipKeyboard
     );
     setStep(telegramId, 'ask_profile');
@@ -212,7 +212,7 @@ async function handleTextInput(ctx) {
     db.updateUser(telegramId, { keywords: text });
     setState(telegramId, { keywords: text });
     await ctx.reply(
-      '👍 Принял! Теперь пришли ссылку на свою страницу в соцсети (необязательно):',
+      '👍 Принял!\n\nПоследний шаг — пришли ссылку на свою страницу в соцсети.\n\nЯ посмотрю как ты уже пишешь и подстрою стиль постов под тебя. Если страницы нет — просто пропусти:',
       kb.skipKeyboard
     );
     setStep(telegramId, 'ask_profile');
@@ -845,7 +845,7 @@ async function handleCallback(ctx) {
       setStep(telegramId, 'ask_post_idea');
     } else if (step === 'ask_post_idea') {
       await ctx.editMessageText(
-        'Хорошо, буду генерировать на основе выбранной темы!\n\nПришли ссылку на свою страницу в соцсети (необязательно):',
+        'Хорошо, буду генерировать на основе выбранной темы!\n\nПришли ссылку на свою страницу в соцсети — я посмотрю как ты уже пишешь и подстрою стиль постов под тебя. Если страницы нет или не хочешь — просто пропусти (необязательно):',
         kb.skipKeyboard
       );
       setStep(telegramId, 'ask_profile');
