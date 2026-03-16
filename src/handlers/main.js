@@ -672,7 +672,7 @@ async function handleCallback(ctx) {
 
     if (state.user_type === 'personal') {
       await ctx.editMessageText(
-        'Что для тебя важно в жизни? (можно выбрать несколько)\n\nЭто поможет боту писать посты на твоём языке — про то что реально волнует тебя и твою аудиторию:',
+        'Выбери тему которая тебе ближе всего — о чём будем писать посты:',
         kb.buildInterestsKeyboard([])
       );
       setState(telegramId, { selected_interests: [] });
@@ -703,43 +703,26 @@ async function handleCallback(ctx) {
     return;
   }
 
-  // Интересы (мультивыбор)
+  // Интересы (одиночный выбор — сразу переходим дальше)
   if (data.startsWith('int_')) {
-    const selected = state.selected_interests || [];
-    const idx = selected.indexOf(data);
-    if (idx === -1) selected.push(data);
-    else selected.splice(idx, 1);
-    setState(telegramId, { selected_interests: selected });
-    await ctx.editMessageReplyMarkup(kb.buildInterestsKeyboard(selected).reply_markup);
+    const item = kb.interestsList.find(i => i.cb === data);
+    const interestLabel = item ? item.text : data;
+
+    db.updateUser(telegramId, { interests: interestLabel });
+    db.addUsedTopic(telegramId, interestLabel);
+    setState(telegramId, { interests: interestLabel, topic: interestLabel, selected_interests: [data] });
+
+    // Замораживаем клавиатуру — показываем выбранное
+    await ctx.editMessageReplyMarkup(kb.buildInterestsKeyboard([data], true).reply_markup);
+
+    await ctx.reply('Для какой соцсети готовим посты?', kb.socialKeyboard);
+    setStep(telegramId, 'ask_social');
     return;
   }
 
   if (data === 'interests_done') {
-    const selected = state.selected_interests || [];
-
-    if (selected.length === 0) {
-      await ctx.answerCbQuery('👆 Выбери хотя бы одну тему!', { show_alert: true });
-      return;
-    }
-
-    const interestLabels = selected.map(cb => {
-      const item = kb.interestsList.find(i => i.cb === cb);
-      return item ? item.text : cb;
-    }).join(', ');
-
-    // Берём первый интерес как тему для генерации
-    const firstInterest = kb.interestsList.find(i => i.cb === selected[0]);
-    const autoTopic = firstInterest ? firstInterest.text : interestLabels;
-
-    db.updateUser(telegramId, { interests: interestLabels });
-    db.addUsedTopic(telegramId, autoTopic);
-    setState(telegramId, { interests: interestLabels, topic: autoTopic });
-
-    // Замораживаем клавиатуру — выбранные с ✅, все становятся noop
-    await ctx.editMessageReplyMarkup(kb.buildInterestsKeyboard(selected, true).reply_markup);
-
-    await ctx.reply('Для какой соцсети готовим посты?', kb.socialKeyboard);
-    setStep(telegramId, 'ask_social');
+    // Страховка если кто-то нажмёт старую кнопку
+    await ctx.answerCbQuery('👆 Выбери тему из списка выше!', { show_alert: true });
     return;
   }
 
