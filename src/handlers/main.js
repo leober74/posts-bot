@@ -1189,19 +1189,20 @@ async function showFinalScreen(ctx) {
 
 // ─── Вспомогательные ─────────────────────────────────────
 function buildUserData(user, state) {
+  const u = user || {}; // защита от undefined
   return {
-    name: user.name,
-    age: user.age,
-    gender: user.gender,
-    user_type: user.user_type,
-    interests: user.interests,
-    business_desc: user.business_desc,
-    social_network: user.social_network || state.social_network || 'Telegram',
-    style: user.style || state.style || 'Дружелюбный',
-    keywords: user.keywords,
-    topic: state.topic || 'развитие и успех',
-    purchase_freq: user.purchase_freq,
-    wants_partners: user.wants_partners
+    name: u.name || state.name || 'автор',
+    age: u.age || state.age,
+    gender: u.gender || state.gender,
+    user_type: u.user_type || state.user_type,
+    interests: u.interests || state.interests,
+    business_desc: u.business_desc || state.business_desc,
+    social_network: u.social_network || state.social_network || 'Telegram',
+    style: u.style || state.style || 'Дружелюбный',
+    keywords: u.keywords || state.keywords || state.post_idea,
+    topic: state.topic || u.keywords || 'развитие и успех',
+    purchase_freq: u.purchase_freq,
+    wants_partners: u.wants_partners
   };
 }
 
