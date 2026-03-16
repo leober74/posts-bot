@@ -152,8 +152,7 @@ function nextPostKeyboard(genId) {
 }
 
 const finalKeyboard = Markup.inlineKeyboard([
-  [Markup.button.callback('💎 Подписка 490 руб/мес', 'subscribe')],
-  [Markup.button.callback('📞 Связаться с экспертом', 'contact_expert')],
+  [Markup.button.callback('💎 Оформить подписку — 100 руб/мес', 'subscribe')],
   [Markup.button.callback('💬 Задать вопрос', 'ask_question')]
 ]);
 
