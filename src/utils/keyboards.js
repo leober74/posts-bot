@@ -34,23 +34,29 @@ const genderKeyboard = Markup.inlineKeyboard([
 ]);
 
 const interestsList = [
-  { text: '💰 Нехватка денег / хочу больше зарабатывать', cb: 'int_money' },
-  { text: '💪 Здоровье и энергия', cb: 'int_health' },
-  { text: '✨ Внешность и уход', cb: 'int_beauty' },
-  { text: '🤖 Освоить новые технологии (IT, нейросети)', cb: 'int_tech' },
-  { text: '❤️ Помогать другим людям', cb: 'int_help' },
-  { text: '✈️ Путешествовать и менять локации', cb: 'int_travel' },
-  { text: '📚 Саморазвитие и образование', cb: 'int_edu' },
-  { text: '🌿 Дом и уют', cb: 'int_home' },
-  { text: '🚗 Авто, недвижимость', cb: 'int_auto' }
+  { text: 'Нехватка денег / хочу больше зарабатывать', emoji: '💰', cb: 'int_money' },
+  { text: 'Здоровье и энергия', emoji: '💪', cb: 'int_health' },
+  { text: 'Внешность и уход', emoji: '✨', cb: 'int_beauty' },
+  { text: 'Освоить новые технологии (IT, нейросети)', emoji: '🤖', cb: 'int_tech' },
+  { text: 'Помогать другим людям', emoji: '❤️', cb: 'int_help' },
+  { text: 'Путешествовать и менять локации', emoji: '✈️', cb: 'int_travel' },
+  { text: 'Саморазвитие и образование', emoji: '📚', cb: 'int_edu' },
+  { text: 'Дом и уют', emoji: '🌿', cb: 'int_home' },
+  { text: 'Авто, недвижимость', emoji: '🚗', cb: 'int_auto' }
 ];
 
 function buildInterestsKeyboard(selected = [], frozen = false) {
   const buttons = interestsList.map(item => {
     const isSelected = selected.includes(item.cb);
-    const label = isSelected ? `✅ ${item.text}` : item.text;
+    const label = isSelected
+      ? `✅ ${item.text} ${item.emoji}`
+      : `${item.text} ${item.emoji}`;
     return [Markup.button.callback(label, frozen ? 'noop' : item.cb)];
   });
+  if (!frozen) {
+    buttons.push([Markup.button.callback('— — — — — — — — —', 'noop')]);
+    buttons.push([Markup.button.callback('🟢 ГОТОВО — продолжить →', 'interests_done')]);
+  }
   return Markup.inlineKeyboard(buttons);
 }
 
