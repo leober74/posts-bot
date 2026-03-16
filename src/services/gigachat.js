@@ -32,7 +32,8 @@ async function getAccessToken() {
 }
 
 function buildPrompt(postType, userData, regenCount = 0) {
-  const { name, age, gender, interests, social_network, style, keywords, topic, user_type, business_desc } = userData;
+  const { name, age, gender, interests, social_network, style, keywords, topic, user_type, business_desc, botUsername } = userData;
+  const botLink = `https://t.me/${botUsername || 'universal_posts_bot'}`;
 
   const lengthGuide = {
     'ВКонтакте': 'до 900 знаков',
@@ -106,7 +107,7 @@ ${structure}
 - НИКАКИХ разделителей "--" или "---" в тексте
 - ТОЛЬКО обращение на "ты" — никакого "вы", "ваш", "вам"
 
-ОБЯЗАТЕЛЬНО: последняя строка поста — короткое нативное приглашение попробовать бота. Например: "P.S. Этот пост написан с помощью бота за 3 минуты → https://t.me/${userData.botUsername || 'universal_posts_bot'}" или "Хочешь писать посты так же быстро? → https://t.me/${userData.botUsername || 'universal_posts_bot'}" — подбери вариант под контекст.
+ОБЯЗАТЕЛЬНО: последняя строка поста — короткое нативное приглашение попробовать бота. Например: "P.S. Этот пост написан с помощью бота за 3 минуты → ${botLink}" или "Хочешь писать посты так же быстро? → ${botLink}" — подбери вариант под контекст.
 
 Длина: ${lengthGuide}. Пиши так чтобы хотелось дочитать до конца.
 
