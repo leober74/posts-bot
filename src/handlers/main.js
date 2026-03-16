@@ -880,19 +880,13 @@ async function handleCallback(ctx) {
     db.updateRating(genId, rating);
 
     if (rating >= 4) {
-      const user = db.getUser(telegramId);
-      const socialNetwork = user.social_network || 'Telegram';
+      const user = db.getUser(telegramId) || {};
+      const socialNetwork = user.social_network || state.social_network || 'Telegram';
       const currentIdx = state.current_post_index || 0;
       const nextIdx = currentIdx + 1;
 
-      // Убираем кнопки оценки
+      // Убираем кнопки оценки — без восторженных фраз
       await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
-
-      const approvedMsg = rating === 5
-        ? '✅ Отличный пост — готов к публикации!'
-        : '😊 Пост готов к публикации.';
-
-      await ctx.reply(approvedMsg);
 
       // Инструкция — только после первого поста
       if (currentIdx === 0) {
@@ -903,15 +897,6 @@ async function handleCallback(ctx) {
         };
         const guide = guides[socialNetwork] || '📋 Скопируй текст поста и вставь в свою соцсеть.';
         await ctx.reply(guide, { parse_mode: 'Markdown' });
-      }
-
-      // NPS после первого одобренного поста у обычных пользователей
-      if (currentIdx === 0 && user.user_type !== 'business') {
-        await ctx.reply(
-          '⭐️ *Быстрый вопрос:*\n\nС какой вероятностью от 0 до 10 ты порекомендуешь этого бота другу?\n\n_0 — точно нет, 10 — точно да_',
-          { parse_mode: 'Markdown', ...kb.npsKeyboard() }
-        );
-        setStep(telegramId, 'nps_personal');
       }
 
       if (nextIdx >= POST_TYPES.length) {
@@ -1137,6 +1122,7 @@ async function generateNextPost(ctx, index) {
 
   try {
     const userData = buildUserData(user, state);
+    userData.botUsername = ctx.botInfo?.username || 'universal_posts_bot';
     const post = await generatePost(postType, userData);
     const genId = db.saveGeneration(telegramId, postType, userData.topic, userData.social_network, post);
     setState(telegramId, { current_gen_id: genId });
@@ -1170,19 +1156,31 @@ async function showFinalScreen(ctx) {
   // Финальный экран для бизнес-сегмента — воронка Deepinvol
   if (user.user_type === 'business') {
     await ctx.reply(
-      `🔥 Все 4 поста готовы!\n\nТеперь главное — когда партнёры начнут откликаться на твои посты, тебе понадобится система для работы с ними: онбординг, обучение, выплаты комиссий.\n\n*Мы строим именно такую платформу — Deepinvol.*\n\nСейчас набираем первых 20 компаний на особых условиях входа. Хочешь попасть в список?`,
+      `✅ Все 4 поста готовы!\n\nТеперь главное — когда партнёры начнут откликаться на твои посты, тебе понадобится система для работы с ними: онбординг, обучение, выплаты комиссий.\n\n*Мы строим именно такую платформу — Deepinvol.*\n\nСейчас набираем первых 20 компаний на особых условиях входа. Хочешь попасть в список?`,
       { parse_mode: 'Markdown', ...kb.deepinvolKeyboard }
     );
   } else {
     await ctx.reply(
-      `🔥 Все 4 поста готовы!\n\nХочешь получать такие посты регулярно по всем темам?`,
+      `✅ Все 4 поста готовы!\n\nХочешь получать такие посты регулярно по всем темам?`,
       kb.finalKeyboard
     );
   }
 
-  // Реферальная ссылка
+  // Объяснение вирального механизма
   await ctx.reply(
-    `🎁 *Реферальная программа*\n\nПриглашай друзей и получай *10%* от их оплаты!\n\nТвоя ссылка:\n\`${refLink}\``,
+    `💡 *Как твои посты приводят новых читателей в бота*\n\n` +
+    `В каждый пост мы незаметно вшиваем приглашение — последняя строка со ссылкой на бота.\n\n` +
+    `Схема простая:\n` +
+    `1. Ты публикуешь пост\n` +
+    `2. Читатель видит пост → думает "хочу так же"\n` +
+    `3. Кликает ссылку в конце → попадает в бота\n` +
+    `4. Ты получаешь *10 руб* за каждого кто оплатит подписку\n\n` +
+    `Простой расчёт:\n` +
+    `• 10 новых пользователей → *100 руб/мес*\n` +
+    `• 50 → *500 руб/мес*\n` +
+    `• 100 → *1 000 руб/мес*\n\n` +
+    `Никаких продаж — просто публикуй посты как обычно.\n\n` +
+    `Твоя реферальная ссылка:\n\`${refLink}\``,
     { parse_mode: 'Markdown' }
   );
 }
