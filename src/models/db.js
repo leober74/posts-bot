@@ -85,6 +85,7 @@ function initDB() {
 
   // Добавляем колонку segment если её нет (для существующих БД)
   try { db.exec(`ALTER TABLE users ADD COLUMN segment TEXT DEFAULT 'general'`); } catch(e) {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN subscription_until TEXT`); } catch(e) {}
 
   console.log('✅ База данных инициализирована');
 }
