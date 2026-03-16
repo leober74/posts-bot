@@ -84,7 +84,7 @@ async function handleStart(ctx) {
   }
 
   db.createUser(telegramId, username);
-  db.updateUser(telegramId, { segment, user_type: null });
+  db.updateUser(telegramId, { segment, user_type: '' });
 
   // Сбрасываем состояние — начинаем чистый диалог
   clearState(telegramId);
@@ -670,16 +670,24 @@ async function handleCallback(ctx) {
     db.updateUser(telegramId, { age });
     setState(telegramId, { age });
 
-    if (state.user_type === 'personal') {
+    if (state.user_type === 'personal' || (!state.user_type && !state.segment?.includes('business'))) {
       await ctx.editMessageText(
         'Выбери тему которая тебе ближе всего — о чём будем писать посты:',
         kb.buildInterestsKeyboard([])
       );
       setState(telegramId, { selected_interests: [] });
       setStep(telegramId, 'ask_interests');
-    } else {
+    } else if (state.user_type === 'business') {
       await ctx.editMessageText('Расскажи о своём бизнесе: что продаёшь, кто клиенты, как часто покупают?\n\n(напиши в свободной форме)');
       setStep(telegramId, 'ask_business_desc');
+    } else {
+      // Страховка — если user_type неизвестен, идём в личный бренд
+      await ctx.editMessageText(
+        'Выбери тему которая тебе ближе всего — о чём будем писать посты:',
+        kb.buildInterestsKeyboard([])
+      );
+      setState(telegramId, { selected_interests: [] });
+      setStep(telegramId, 'ask_interests');
     }
     return;
   }
