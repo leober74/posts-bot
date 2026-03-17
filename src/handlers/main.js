@@ -711,26 +711,98 @@ async function handleCallback(ctx) {
     return;
   }
 
-  // Интересы (одиночный выбор — сразу переходим дальше)
+  // Интересы (мультивыбор — выбираешь несколько, потом одну тему)
   if (data.startsWith('int_')) {
-    const item = kb.interestsList.find(i => i.cb === data);
-    const interestLabel = item ? item.text : data;
-
-    db.updateUser(telegramId, { interests: interestLabel });
-    db.addUsedTopic(telegramId, interestLabel);
-    setState(telegramId, { interests: interestLabel, topic: interestLabel, selected_interests: [data] });
-
-    // Замораживаем клавиатуру — показываем выбранное
-    await ctx.editMessageReplyMarkup(kb.buildInterestsKeyboard([data], true).reply_markup);
-
-    await ctx.reply('Для какой соцсети готовим посты?', kb.socialKeyboard);
-    setStep(telegramId, 'ask_social');
+    const selected = state.selected_interests || [];
+    const idx = selected.indexOf(data);
+    if (idx === -1) selected.push(data);
+    else selected.splice(idx, 1);
+    setState(telegramId, { selected_interests: selected });
+    await ctx.editMessageReplyMarkup(kb.buildInterestsKeyboard(selected).reply_markup);
     return;
   }
 
   if (data === 'interests_done') {
-    // Страховка если кто-то нажмёт старую кнопку
-    await ctx.answerCbQuery('👆 Выбери тему из списка выше!', { show_alert: true });
+    const selected = state.selected_interests || [];
+
+    if (selected.length === 0) {
+      await ctx.answerCbQuery('👆 Выбери хотя бы один интерес!', { show_alert: true });
+      return;
+    }
+
+    const interestLabels = selected.map(cb => {
+      const item = kb.interestsList.find(i => i.cb === cb);
+      return item ? item.text : cb;
+    }).join(', ');
+
+    db.updateUser(telegramId, { interests: interestLabels });
+    setState(telegramId, { interests: interestLabels });
+
+    // Замораживаем клавиатуру интересов
+    await ctx.editMessageReplyMarkup(kb.buildInterestsKeyboard(selected, true).reply_markup);
+
+    // Если один интерес — берём сразу как тему
+    if (selected.length === 1) {
+      const item = kb.interestsList.find(i => i.cb === selected[0]);
+      const autoTopic = item ? item.text : interestLabels;
+      db.addUsedTopic(telegramId, autoTopic);
+      setState(telegramId, { topic: autoTopic });
+      await ctx.reply('Для какой соцсети готовим посты?', kb.socialKeyboard);
+      setStep(telegramId, 'ask_social');
+    } else {
+      // Несколько — спрашиваем о чём пишем
+      const { Markup } = require('telegraf');
+      const topicKeyboard = Markup.inlineKeyboard(
+        selected.map(cb => {
+          const item = kb.interestsList.find(i => i.cb === cb);
+          return [Markup.button.callback(
+            item ? `${item.text} ${item.emoji}` : cb,
+            `pick_topic_${cb}`
+          )];
+        })
+      );
+      await ctx.reply(
+        '✅ Записал!\n\nТеперь выбери *одну тему* — о чём пишем посты прямо сейчас:',
+        { parse_mode: 'Markdown', ...topicKeyboard }
+      );
+      setStep(telegramId, 'pick_topic');
+    }
+    return;
+  }
+
+  // Выбор конкретной темы из интересов
+  if (data.startsWith('pick_topic_')) {
+    const cb = data.replace('pick_topic_', '');
+    const item = kb.interestsList.find(i => i.cb === cb);
+    const topic = item ? item.text : cb;
+    const user = db.getUser(telegramId);
+    const usedTopics = db.getUsedTopics(telegramId);
+
+    if (usedTopics.includes(topic) && user?.status !== 'subscribed') {
+      await ctx.editMessageText(
+        `Тема «${topic}» уже использована.\n\nДля доступа ко всем темам — оформи подписку 💎`,
+        kb.finalKeyboard
+      );
+      return;
+    }
+
+    db.addUsedTopic(telegramId, topic);
+    setState(telegramId, { topic });
+
+    // Замораживаем с галочкой
+    const { Markup } = require('telegraf');
+    const selected = state.selected_interests || [];
+    const frozenKeyboard = Markup.inlineKeyboard(
+      selected.map(s => {
+        const i = kb.interestsList.find(x => x.cb === s);
+        const label = i ? (s === cb ? `✅ ${i.text} ${i.emoji}` : `${i.text} ${i.emoji}`) : s;
+        return [Markup.button.callback(label, 'noop')];
+      })
+    );
+    await ctx.editMessageReplyMarkup(frozenKeyboard.reply_markup);
+
+    await ctx.reply('Для какой соцсети готовим посты?', kb.socialKeyboard);
+    setStep(telegramId, 'ask_social');
     return;
   }
 
@@ -1184,6 +1256,11 @@ async function showFinalScreen(ctx) {
     `Никаких продаж — просто публикуй посты как обычно.\n\n` +
     `Твоя реферальная ссылка (если захочешь просто её скопировать):\n${refLink}`,
     { parse_mode: 'Markdown' }
+  );
+
+  await ctx.reply(
+    `💎 *Хочешь писать посты на любую тему без ограничений?*\n\nВ подписке все темы открыты сразу — не нужно каждый раз начинать заново. Плюс картинки к постам, аналитика и приоритетная поддержка.`,
+    { parse_mode: 'Markdown', ...kb.finalKeyboard }
   );
 }
 
