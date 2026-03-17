@@ -1,8 +1,8 @@
 const { Markup } = require('telegraf');
 
 const typeKeyboard = Markup.inlineKeyboard([
-  [Markup.button.callback('🔹 Для себя — личный бренд и экспертиза', 'type_personal')],
-  [Markup.button.callback('🏢 Есть бизнес — хочу партнёрскую сеть', 'type_business')]
+  [Markup.button.callback('🔹 Развиваю себя как эксперт', 'type_personal')],
+  [Markup.button.callback('🏢 У меня есть свой бизнес', 'type_business')]
 ]);
 
 // Квалификационные вопросы для бизнес-ветки
@@ -33,16 +33,17 @@ const genderKeyboard = Markup.inlineKeyboard([
   [Markup.button.callback('Мужской', 'gender_male'), Markup.button.callback('Женский', 'gender_female')]
 ]);
 
+// ─── Интересы для личной ветки ────────────────────────────
 const interestsList = [
-  { text: 'Нехватка денег / хочу больше зарабатывать', emoji: '💰', cb: 'int_money' },
+  { text: 'Хочу больше зарабатывать', emoji: '💰', cb: 'int_money' },
   { text: 'Здоровье и энергия', emoji: '💪', cb: 'int_health' },
-  { text: 'Внешность и уход', emoji: '✨', cb: 'int_beauty' },
-  { text: 'Освоить новые технологии (IT, нейросети)', emoji: '🤖', cb: 'int_tech' },
-  { text: 'Помогать другим людям', emoji: '❤️', cb: 'int_help' },
-  { text: 'Путешествовать и менять локации', emoji: '✈️', cb: 'int_travel' },
-  { text: 'Саморазвитие и образование', emoji: '📚', cb: 'int_edu' },
-  { text: 'Дом и уют', emoji: '🌿', cb: 'int_home' },
-  { text: 'Авто, недвижимость', emoji: '🚗', cb: 'int_auto' }
+  { text: 'Внешность и уход за собой', emoji: '✨', cb: 'int_beauty' },
+  { text: 'IT и нейросети', emoji: '🤖', cb: 'int_tech' },
+  { text: 'Отношения и семья', emoji: '❤️', cb: 'int_relations' },
+  { text: 'Образование и саморазвитие', emoji: '📚', cb: 'int_edu' },
+  { text: 'Путешествия и образ жизни', emoji: '✈️', cb: 'int_travel' },
+  { text: 'Бизнес и предпринимательство', emoji: '🚀', cb: 'int_business' },
+  { text: 'Дом и уют', emoji: '🌿', cb: 'int_home' }
 ];
 
 function buildInterestsKeyboard(selected = [], frozen = false) {
@@ -60,14 +61,27 @@ function buildInterestsKeyboard(selected = [], frozen = false) {
   return Markup.inlineKeyboard(buttons);
 }
 
+// ─── Темы для личной ветки ────────────────────────────────
+const TOPIC_LABELS = {
+  topic_income: 'Дополнительный доход',
+  topic_health: 'Здоровье и красота',
+  topic_relations: 'Отношения и семья',
+  topic_edu: 'Образование и саморазвитие',
+  topic_tech: 'IT и нейросети',
+  topic_travel: 'Путешествия и образ жизни',
+  topic_business: 'Бизнес и предпринимательство',
+  topic_home: 'Дом и уют'
+};
+
 const topicsKeyboard = Markup.inlineKeyboard([
-  [Markup.button.callback('💸 Экономия и скидки', 'topic_economy')],
-  [Markup.button.callback('💼 Дополнительный доход', 'topic_income')],
-  [Markup.button.callback('📈 Инвестиции', 'topic_invest')],
+  [Markup.button.callback('💰 Дополнительный доход', 'topic_income')],
+  [Markup.button.callback('💪 Здоровье и красота', 'topic_health')],
+  [Markup.button.callback('❤️ Отношения и семья', 'topic_relations')],
+  [Markup.button.callback('📚 Образование и саморазвитие', 'topic_edu')],
   [Markup.button.callback('🤖 IT и нейросети', 'topic_tech')],
-  [Markup.button.callback('💆 Здоровье и красота', 'topic_health')],
-  [Markup.button.callback('🏠 Дом и семья', 'topic_home')],
-  [Markup.button.callback('🚗 Авто и недвижимость', 'topic_auto')]
+  [Markup.button.callback('✈️ Путешествия и образ жизни', 'topic_travel')],
+  [Markup.button.callback('🚀 Бизнес и предпринимательство', 'topic_business')],
+  [Markup.button.callback('🌿 Дом и уют', 'topic_home')]
 ]);
 
 const socialKeyboard = Markup.inlineKeyboard([
@@ -103,7 +117,6 @@ function ratingKeyboard(genId) {
 }
 
 function feedbackKeyboard() {
-  // Полный пул вариантов
   const pool = [
     { text: '📏 Слишком длинно — сократи', cb: 'fb_long' },
     { text: '📝 Слишком коротко — раскрой', cb: 'fb_short' },
@@ -116,8 +129,6 @@ function feedbackKeyboard() {
     { text: '🎯 Не про мою аудиторию — перепиши', cb: 'fb_audience' },
     { text: '💬 Нет вовлечения — добавь вопрос', cb: 'fb_engage' },
   ];
-
-  // Перемешиваем и берём 5 случайных + всегда оставляем "объясню сам"
   const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 5);
   const buttons = shuffled.map(item => [Markup.button.callback(item.text, item.cb)]);
   buttons.push([Markup.button.callback('✏️ Объясню сам что изменить', 'fb_custom')]);
@@ -126,15 +137,9 @@ function feedbackKeyboard() {
 
 function publishGuideKeyboard(genId, socialNetwork) {
   const guides = {
-    'ВКонтакте': [
-      [Markup.button.callback('📋 Как опубликовать во ВКонтакте', `guide_vk_${genId}`)],
-    ],
-    'Telegram': [
-      [Markup.button.callback('📋 Как опубликовать в Telegram', `guide_tg_${genId}`)],
-    ],
-    'Instagram': [
-      [Markup.button.callback('📋 Как опубликовать в Instagram', `guide_ig_${genId}`)],
-    ]
+    'ВКонтакте': [[Markup.button.callback('📋 Как опубликовать во ВКонтакте', `guide_vk_${genId}`)]],
+    'Telegram': [[Markup.button.callback('📋 Как опубликовать в Telegram', `guide_tg_${genId}`)]],
+    'Instagram': [[Markup.button.callback('📋 Как опубликовать в Instagram', `guide_ig_${genId}`)]]
   };
   const guideBtn = guides[socialNetwork] || [[Markup.button.callback('📋 Как скопировать и опубликовать', `guide_other_${genId}`)]];
   return Markup.inlineKeyboard([
@@ -164,40 +169,34 @@ const continueKeyboard = Markup.inlineKeyboard([
   [Markup.button.callback('➡️ Продолжить', 'continue')]
 ]);
 
-// Вопрос про ошибки в расчётах
 const calcErrorsKeyboard = Markup.inlineKeyboard([
   [Markup.button.callback('✅ Да, были ошибки / конфликты', 'calc_errors_yes')],
   [Markup.button.callback('🟢 Нет, всё чисто', 'calc_errors_no')]
 ]);
 
-// Оффер пилота
 const pilotOfferKeyboard = Markup.inlineKeyboard([
   [Markup.button.callback('✅ Да, хочу бесплатный пилот', 'pilot_yes')],
   [Markup.button.callback('❓ Есть вопросы', 'pilot_questions')],
   [Markup.button.callback('⏳ Позже, сначала посты', 'pilot_later')]
 ]);
 
-// Фильтр для партнёров Shop
 const partnerFilterKeyboard = Markup.inlineKeyboard([
   [Markup.button.callback('✅ Да, уже работаю с партнёрской программой', 'pf_has_partner')],
   [Markup.button.callback('🏢 Есть свой бизнес, ищу партнёров', 'pf_has_business')],
   [Markup.button.callback('🔍 Нет, ищу возможности', 'pf_no_partner')]
 ]);
 
-// Воронка Deepinvol для бизнес-ветки
 const deepinvolKeyboard = Markup.inlineKeyboard([
   [Markup.button.callback('✅ Да, хочу попасть в первые 20', 'deepinvol_join')],
   [Markup.button.callback('📋 Расскажи подробнее о платформе', 'deepinvol_info')],
   [Markup.button.callback('⏭ Позже', 'noop')]
 ]);
 
-// Интервью — предложение пройти
 const interviewOfferKeyboard = Markup.inlineKeyboard([
   [Markup.button.callback('✅ Да, пройду (2 минуты)', 'interview_start')],
   [Markup.button.callback('⏭ Пропустить', 'interview_skip')]
 ]);
 
-// WTP ценники
 const wtpYesKeyboard = Markup.inlineKeyboard([
   [Markup.button.callback('до 5 000 ₽/мес', 'wtp_yes_5k')],
   [Markup.button.callback('5 000 – 15 000 ₽/мес', 'wtp_yes_15k')],
@@ -222,7 +221,6 @@ const wtpNoKeyboard = Markup.inlineKeyboard([
   [Markup.button.callback('больше 75 000 ₽/мес', 'wtp_no_75kplus')]
 ]);
 
-// NPS 0-10
 function npsKeyboard() {
   return Markup.inlineKeyboard([
     [0,1,2,3,4].map(n => Markup.button.callback(`${n}`, `nps_${n}`)),
@@ -233,7 +231,7 @@ function npsKeyboard() {
 
 module.exports = {
   typeKeyboard, ageKeyboard, genderKeyboard,
-  buildInterestsKeyboard, interestsList,
+  buildInterestsKeyboard, interestsList, TOPIC_LABELS,
   topicsKeyboard, socialKeyboard, styleKeyboard,
   purchaseFreqKeyboard, partnersKeyboard,
   ratingKeyboard, feedbackKeyboard, nextPostKeyboard, publishGuideKeyboard,
