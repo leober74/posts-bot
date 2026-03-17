@@ -1,8 +1,8 @@
 const { Markup } = require('telegraf');
 
 const typeKeyboard = Markup.inlineKeyboard([
-  [Markup.button.callback('🔹 Развиваю себя как эксперт', 'type_personal')],
-  [Markup.button.callback('🏢 У меня есть свой бизнес', 'type_business')]
+  [Markup.button.callback('Развиваю себя как эксперт 🔹', 'type_personal')],
+  [Markup.button.callback('У меня есть свой бизнес 🏢', 'type_business')]
 ]);
 
 // Квалификационные вопросы для бизнес-ветки
