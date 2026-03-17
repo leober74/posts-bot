@@ -672,7 +672,7 @@ async function handleCallback(ctx) {
 
     if (state.user_type === 'personal' || (!state.user_type && !state.segment?.includes('business'))) {
       await ctx.editMessageText(
-        'Выбери тему которая тебе ближе всего — о чём будем писать посты:',
+        'Что тебе близко в жизни? (можно выбрать несколько)\n\nПотом уточним о чём именно пишем:',
         kb.buildInterestsKeyboard([])
       );
       setState(telegramId, { selected_interests: [] });
@@ -681,9 +681,8 @@ async function handleCallback(ctx) {
       await ctx.editMessageText('Расскажи о своём бизнесе: что продаёшь, кто клиенты, как часто покупают?\n\n(напиши в свободной форме)');
       setStep(telegramId, 'ask_business_desc');
     } else {
-      // Страховка — если user_type неизвестен, идём в личный бренд
       await ctx.editMessageText(
-        'Выбери тему которая тебе ближе всего — о чём будем писать посты:',
+        'Что тебе близко в жизни? (можно выбрать несколько)\n\nПотом уточним о чём именно пишем:',
         kb.buildInterestsKeyboard([])
       );
       setState(telegramId, { selected_interests: [] });
@@ -699,7 +698,7 @@ async function handleCallback(ctx) {
     setState(telegramId, { gender });
     if (state.user_type === 'personal') {
       await ctx.editMessageText(
-        'Что для тебя важно в жизни? (можно выбрать несколько)\n\nЭто поможет боту писать посты на твоём языке:',
+        'Что тебе близко в жизни? (можно выбрать несколько)\n\nПотом уточним о чём именно пишем:',
         kb.buildInterestsKeyboard([])
       );
       setState(telegramId, { selected_interests: [] });
