@@ -1065,7 +1065,7 @@ async function handleCallback(ctx) {
 
   // Финальные кнопки
   if (data === 'subscribe') {
-    const { createPaymentLink } = require('./services/payment') ;
+    const { createPaymentLink } = require('../services/payment');
     const payLink = await createPaymentLink(telegramId) ||
       'https://checkout.tochka.com/09495d68-9066-4f07-8349-fe75292f7b86';
 
