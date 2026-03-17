@@ -843,11 +843,12 @@ async function handleCallback(ctx) {
       await ctx.answerCbQuery('👆 Выбери хотя бы одну тему!', { show_alert: true });
       return;
     }
+
     const topicLabel = refined.join(' + ');
     db.addUsedTopic(telegramId, topicLabel);
     setState(telegramId, { topic: topicLabel });
 
-    // Замораживаем список — показываем что выбрал, но некликабельно
+    // Замораживаем список
     const { Markup } = require('telegraf');
     const selected = state.selected_interests || [];
     const frozenKeyboard = Markup.inlineKeyboard(
@@ -1004,7 +1005,7 @@ async function handleCallback(ctx) {
     db.updateUser(telegramId, { style });
     setState(telegramId, { style });
     await ctx.editMessageText(
-      '✍️ Последний шаг!\n\nПришли важный текст, который хочешь использовать или перечисли ключевые слова для будущего поста, а может быть просто расскажи коротко то, о чём ты хочешь написать в посте? _(можно отправить голосовое)_\n\nНапример: "хочу рассказать как я бросил офис и открыл своё дело" или "хочу привлечь партнёров в свой бизнес по доставке" _(Чем конкретнее — тем точнее получится пост)_ 🎯\n\nНо, всё это не обязательно мне отправлять!\n_(если не хочешь, можешь пропустить — я и без этой информации сделаю всё круто для тебя)_',
+      '✍️ Есть идея для поста? Напиши пару слов — сделаю точнее.\n\n_Или пропусти — справлюсь и так_ 👇',
       { parse_mode: 'Markdown', ...kb.skipKeyboard }
     );
     setStep(telegramId, 'ask_post_idea');
@@ -1017,7 +1018,7 @@ async function handleCallback(ctx) {
     if (step === 'ask_style' || step === 'ask_style_examples') {
       setState(telegramId, { style: 'Дружелюбный' });
       await ctx.editMessageText(
-        '✍️ Последний шаг!\n\nПришли важный текст, который хочешь использовать или перечисли ключевые слова для будущего поста, а может быть просто расскажи коротко то, о чём ты хочешь написать в посте? _(можно отправить голосовое)_\n\nНапример: "хочу рассказать как похудел на 10 кг" или "ищу партнёров для бизнеса" _(Чем конкретнее — тем точнее получится пост)_ 🎯\n\nНо, всё это не обязательно мне отправлять!\n_(если не хочешь, можешь пропустить — я и без этой информации сделаю всё круто для тебя)_',
+        '✍️ Есть идея для поста? Напиши пару слов — сделаю точнее.\n\n_Или пропусти — справлюсь и так_ 👇',
         { parse_mode: 'Markdown', ...kb.skipKeyboard }
       );
       setStep(telegramId, 'ask_post_idea');
