@@ -26,6 +26,7 @@ function initDB() {
       referral_code TEXT UNIQUE,
       referred_by TEXT,
       segment TEXT DEFAULT 'general',
+      subscription_until TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -83,24 +84,20 @@ function initDB() {
     );
   `);
 
-  // Добавляем колонку segment если её нет (для существующих БД)
   try { db.exec(`ALTER TABLE users ADD COLUMN segment TEXT DEFAULT 'general'`); } catch(e) {}
   try { db.exec(`ALTER TABLE users ADD COLUMN subscription_until TEXT`); } catch(e) {}
 
   console.log('✅ База данных инициализирована');
 }
 
-// USERS
 function getUser(telegramId) {
   return db.prepare('SELECT * FROM users WHERE telegram_id = ?').get(String(telegramId));
 }
 
 function createUser(telegramId, username) {
   const refCode = 'ref_' + telegramId;
-  db.prepare(`
-    INSERT OR IGNORE INTO users (telegram_id, username, referral_code)
-    VALUES (?, ?, ?)
-  `).run(String(telegramId), username || '', refCode);
+  db.prepare(`INSERT OR IGNORE INTO users (telegram_id, username, referral_code) VALUES (?, ?, ?)`)
+    .run(String(telegramId), username || '', refCode);
   return getUser(telegramId);
 }
 
@@ -122,7 +119,49 @@ function addBalance(telegramId, amount) {
     .run(amount, String(telegramId));
 }
 
-// ИНТЕРВЬЮ (бизнес-ветка)
+// ─── Подписка ─────────────────────────────────────────────
+
+function activateSubscription(telegramId) {
+  const until = new Date();
+  until.setDate(until.getDate() + 30);
+  const untilStr = until.toISOString();
+  db.prepare(`UPDATE users SET status = 'subscribed', subscription_until = ? WHERE telegram_id = ?`)
+    .run(untilStr, String(telegramId));
+  return untilStr;
+}
+
+function checkSubscription(telegramId) {
+  const user = getUser(telegramId);
+  if (!user || user.status !== 'subscribed' || !user.subscription_until) return;
+  if (new Date() > new Date(user.subscription_until)) {
+    db.prepare(`UPDATE users SET status = 'free' WHERE telegram_id = ?`).run(String(telegramId));
+  }
+}
+
+function getUsersExpiringIn(days) {
+  const from = new Date();
+  from.setDate(from.getDate() + days);
+  from.setHours(0, 0, 0, 0);
+  const to = new Date(from);
+  to.setHours(23, 59, 59, 999);
+  return db.prepare(`
+    SELECT * FROM users
+    WHERE status = 'subscribed'
+    AND subscription_until >= ? AND subscription_until <= ?
+  `).all(from.toISOString(), to.toISOString());
+}
+
+function getExpiredSubscriptions() {
+  return db.prepare(`
+    SELECT * FROM users
+    WHERE status = 'subscribed'
+    AND subscription_until IS NOT NULL
+    AND subscription_until < ?
+  `).all(new Date().toISOString());
+}
+
+// ─── Интервью ─────────────────────────────────────────────
+
 function saveInterview(telegramId, data) {
   const user = getUser(telegramId);
   db.prepare(`
@@ -130,15 +169,10 @@ function saveInterview(telegramId, data) {
       (telegram_id, username, name, business_desc, main_problem, tried_before, wtp_yes, wtp_maybe, wtp_no, nps_score)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    String(telegramId),
-    user?.username || '',
-    data.name || user?.name || '',
-    data.business_desc || user?.business_desc || '',
-    data.main_problem || '',
-    data.tried_before || '',
-    data.wtp_yes || '',
-    data.wtp_maybe || '',
-    data.wtp_no || '',
+    String(telegramId), user?.username || '',
+    data.name || user?.name || '', data.business_desc || user?.business_desc || '',
+    data.main_problem || '', data.tried_before || '',
+    data.wtp_yes || '', data.wtp_maybe || '', data.wtp_no || '',
     data.nps_score || null
   );
 }
@@ -147,12 +181,9 @@ function getInterviews() {
   return db.prepare('SELECT * FROM interviews ORDER BY created_at DESC').all();
 }
 
-// NPS
 function saveNPS(telegramId, userType, score, comment) {
-  db.prepare(`
-    INSERT INTO nps_scores (telegram_id, user_type, score, comment)
-    VALUES (?, ?, ?, ?)
-  `).run(String(telegramId), userType, score, comment || '');
+  db.prepare(`INSERT INTO nps_scores (telegram_id, user_type, score, comment) VALUES (?, ?, ?, ?)`)
+    .run(String(telegramId), userType, score, comment || '');
 }
 
 function getNPSStats() {
@@ -167,24 +198,18 @@ function getNPSStats() {
   return { avg, promoters, detractors, passives, nps, total };
 }
 
-// DEEPINVOL LEADS
 function saveDeepinvolLead(telegramId, username, name, businessDesc, contact) {
-  db.prepare(`
-    INSERT INTO deepinvol_leads (telegram_id, username, name, business_desc, contact)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(String(telegramId), username || '', name || '', businessDesc || '', contact || '');
+  db.prepare(`INSERT INTO deepinvol_leads (telegram_id, username, name, business_desc, contact) VALUES (?, ?, ?, ?, ?)`)
+    .run(String(telegramId), username || '', name || '', businessDesc || '', contact || '');
 }
 
 function getDeepinvolLeads() {
   return db.prepare('SELECT * FROM deepinvol_leads ORDER BY created_at DESC').all();
 }
 
-// GENERATIONS
 function saveGeneration(telegramId, postType, topic, socialNetwork, content) {
-  db.prepare(`
-    INSERT INTO generations (telegram_id, post_type, topic, social_network, content)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(String(telegramId), postType, topic, socialNetwork, content);
+  db.prepare(`INSERT INTO generations (telegram_id, post_type, topic, social_network, content) VALUES (?, ?, ?, ?, ?)`)
+    .run(String(telegramId), postType, topic, socialNetwork, content);
   return db.prepare('SELECT last_insert_rowid() as id').get().id;
 }
 
@@ -196,49 +221,36 @@ function markPublished(generationId) {
   db.prepare('UPDATE generations SET published = 1 WHERE id = ?').run(generationId);
 }
 
-// TOPICS
 function getUsedTopics(telegramId) {
-  const rows = db.prepare('SELECT topic FROM topics_used WHERE telegram_id = ?').all(String(telegramId));
-  return rows.map(r => r.topic);
+  return db.prepare('SELECT topic FROM topics_used WHERE telegram_id = ?')
+    .all(String(telegramId)).map(r => r.topic);
 }
 
 function addUsedTopic(telegramId, topic) {
   db.prepare('INSERT INTO topics_used (telegram_id, topic) VALUES (?, ?)').run(String(telegramId), topic);
 }
 
-// ANALYTICS
 function getStats() {
   const totalUsers = db.prepare('SELECT COUNT(*) as c FROM users').get().c;
   const freeUsers = db.prepare("SELECT COUNT(*) as c FROM users WHERE status = 'free'").get().c;
   const paidUsers = db.prepare("SELECT COUNT(*) as c FROM users WHERE status = 'subscribed'").get().c;
   const totalGenerations = db.prepare('SELECT COUNT(*) as c FROM generations').get().c;
   const published = db.prepare('SELECT COUNT(*) as c FROM generations WHERE published = 1').get().c;
-  const totalRevenue = paidUsers * 490;
-
-  // По сегментам
+  const totalRevenue = paidUsers * 100;
   const segmentGeneral = db.prepare("SELECT COUNT(*) as c FROM users WHERE segment = 'general' OR segment IS NULL").get().c;
   const segmentNoshop = db.prepare("SELECT COUNT(*) as c FROM users WHERE segment = 'noshop'").get().c;
   const segmentBusiness = db.prepare("SELECT COUNT(*) as c FROM users WHERE segment = 'business'").get().c;
-
-  // Реферальная статистика
   const topReferrers = db.prepare(`
     SELECT u.username, u.name, u.telegram_id, u.balance,
            COUNT(r.id) as referrals,
            SUM(CASE WHEN r.status = 'subscribed' THEN 1 ELSE 0 END) as paid_referrals
     FROM users u
     LEFT JOIN users r ON r.referred_by = u.referral_code
-    GROUP BY u.telegram_id
-    HAVING referrals > 0
-    ORDER BY referrals DESC
-    LIMIT 10
+    GROUP BY u.telegram_id HAVING referrals > 0
+    ORDER BY referrals DESC LIMIT 10
   `).all();
-
-  const topTopics = db.prepare(`
-    SELECT topic, COUNT(*) as cnt FROM generations GROUP BY topic ORDER BY cnt DESC LIMIT 5
-  `).all();
-
+  const topTopics = db.prepare(`SELECT topic, COUNT(*) as cnt FROM generations GROUP BY topic ORDER BY cnt DESC LIMIT 5`).all();
   const deepinvolLeads = db.prepare('SELECT COUNT(*) as c FROM deepinvol_leads').get().c;
-
   return {
     totalUsers, freeUsers, paidUsers, totalRevenue,
     totalGenerations, published,
@@ -253,5 +265,7 @@ module.exports = {
   getUsedTopics, addUsedTopic, getStats,
   saveDeepinvolLead, getDeepinvolLeads,
   saveInterview, getInterviews,
-  saveNPS, getNPSStats
+  saveNPS, getNPSStats,
+  activateSubscription, checkSubscription,
+  getUsersExpiringIn, getExpiredSubscriptions
 };
