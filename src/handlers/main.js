@@ -78,6 +78,8 @@ async function handleStart(ctx) {
 
   db.createUser(telegramId, username);
   db.updateUser(telegramId, { segment, user_type: '' });
+  // Проверяем не истекла ли подписка
+  db.checkSubscription(telegramId);
 
   // Сбрасываем состояние — начинаем чистый диалог
   clearState(telegramId);
