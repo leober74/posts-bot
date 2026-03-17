@@ -2,6 +2,7 @@ const { getState, setState, clearState, setStep, getStep } = require('../service
 const db = require('../models/db');
 const { generatePost, regeneratePost } = require('../services/gigachat');
 const kb = require('../utils/keyboards');
+const TOPIC_LABELS = kb.TOPIC_LABELS;
 
 const POST_TYPES = ['продающий', 'развлекательный', 'экспертный', 'вовлекающий'];
 
@@ -49,15 +50,7 @@ function detectGender(name) {
   return 'Мужской'; // по умолчанию
 }
 
-const TOPIC_LABELS = {
-  topic_economy: 'Экономия и скидки',
-  topic_income: 'Дополнительный доход',
-  topic_invest: 'Инвестиции',
-  topic_tech: 'IT и нейросети',
-  topic_health: 'Здоровье и красота',
-  topic_home: 'Дом и семья',
-  topic_auto: 'Авто и недвижимость'
-};
+// Темы берём из keyboards.js — единый источник правды
 
 // ─── /start ───────────────────────────────────────────────
 async function handleStart(ctx) {
@@ -119,11 +112,11 @@ async function handleTypeChoice(ctx, userType) {
   await ctx.editMessageReplyMarkup(
     Markup.inlineKeyboard([
       [Markup.button.callback(
-        userType === 'personal' ? '✅ 🔹 Для себя' : '🔹 Для себя',
+        userType === 'personal' ? '✅ 🔹 Развиваю себя как эксперт' : '🔹 Развиваю себя как эксперт',
         'noop'
       )],
       [Markup.button.callback(
-        userType === 'business' ? '✅ 🏢 Есть бизнес — хочу партнёрскую сеть' : '🏢 Есть бизнес — хочу партнёрскую сеть',
+        userType === 'business' ? '✅ 🏢 У меня есть свой бизнес' : '🏢 У меня есть свой бизнес',
         'noop'
       )]
     ]).reply_markup
