@@ -1126,8 +1126,12 @@ async function handleCallback(ctx) {
         await ctx.telegram.deleteMessage(telegramId, state.current_post_msg_id).catch(() => {});
       }
 
+      await ctx.reply(
+        `📝 *${state.current_post_type.toUpperCase()}* — вариант ${regenCount + 1}\n\n${formatPost(newPost)}`,
+        { parse_mode: 'Markdown' }
+      );
       const postMsg = await ctx.reply(
-        `📝 *${state.current_post_type.toUpperCase()}* — вариант ${regenCount + 1}\n\n${formatPost(newPost)}\n\n⭐️ Оцени:`,
+        '⭐️ Оцени пост:',
         { parse_mode: 'Markdown', ...kb.ratingKeyboard(genId) }
       );
       setState(telegramId, { current_post_msg_id: postMsg.message_id });
@@ -1303,8 +1307,15 @@ async function generateNextPost(ctx, index) {
 
     const formattedPost = formatPost(post);
 
+    // Сначала сам пост — без кнопок, чтобы удобно копировать
+    await ctx.reply(
+      `📝 *Пост ${index + 1} из 4 — ${postType.toUpperCase()}*\n\n${formattedPost}`,
+      { parse_mode: 'Markdown' }
+    );
+
+    // Отдельным сообщением — оценка с кнопками
     const postMsg = await ctx.reply(
-      `📝 *Пост ${index + 1} из 4 — ${postType.toUpperCase()}*\n\n${formattedPost}\n\n⭐️ Оцени пост:`,
+      '⭐️ Оцени пост:',
       { parse_mode: 'Markdown', ...kb.ratingKeyboard(genId) }
     );
     setState(telegramId, { current_post_msg_id: postMsg.message_id });
