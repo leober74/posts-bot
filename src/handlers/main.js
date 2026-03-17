@@ -112,11 +112,11 @@ async function handleTypeChoice(ctx, userType) {
   await ctx.editMessageReplyMarkup(
     Markup.inlineKeyboard([
       [Markup.button.callback(
-        userType === 'personal' ? 'Развиваю себя как эксперт ✅' : 'Развиваю себя как эксперт 🔹',
+        userType === 'personal' ? '✅ Развиваю себя как эксперт' : '🔹 Развиваю себя как эксперт',
         'noop'
       )],
       [Markup.button.callback(
-        userType === 'business' ? 'У меня есть свой бизнес ✅' : 'У меня есть свой бизнес 🏢',
+        userType === 'business' ? '✅ У меня есть свой бизнес' : '🏢 У меня есть свой бизнес',
         'noop'
       )]
     ]).reply_markup
