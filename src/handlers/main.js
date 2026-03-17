@@ -813,6 +813,10 @@ async function handleCallback(ctx) {
   if (data === 'topic_refine') {
     const selected = state.selected_interests || [];
     const { Markup } = require('telegraf');
+
+    // Инициализируем список выбранных уточнённых тем
+    setState(telegramId, { refined_topics: [] });
+
     const topicKeyboard = Markup.inlineKeyboard([
       ...selected.map(cb => {
         const item = kb.interestsList.find(i => i.cb === cb);
@@ -820,7 +824,9 @@ async function handleCallback(ctx) {
           item ? `${item.text} ${item.emoji}` : cb,
           `pick_topic_${cb}`
         )];
-      })
+      }),
+      [Markup.button.callback('— — — — — — — — —', 'noop')],
+      [Markup.button.callback('✅ Готово — писать посты!', 'refined_done')]
     ]);
     await ctx.editMessageText(
       'Выбери 1-2 темы которые сейчас важнее всего — о них и напишем:',
@@ -830,7 +836,23 @@ async function handleCallback(ctx) {
     return;
   }
 
-  // Выбор конкретной темы из интересов
+  // Подтверждение выбора уточнённых тем
+  if (data === 'refined_done') {
+    const refined = state.refined_topics || [];
+    if (refined.length === 0) {
+      await ctx.answerCbQuery('👆 Выбери хотя бы одну тему!', { show_alert: true });
+      return;
+    }
+    const topicLabel = refined.join(' + ');
+    db.addUsedTopic(telegramId, topicLabel);
+    setState(telegramId, { topic: topicLabel });
+    await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
+    await ctx.reply('Для какой соцсети готовим посты?', kb.socialKeyboard);
+    setStep(telegramId, 'ask_social');
+    return;
+  }
+
+  // Выбор конкретной темы из интересов (мультивыбор до 2)
   if (data.startsWith('pick_topic_')) {
     const cb = data.replace('pick_topic_', '');
     const item = kb.interestsList.find(i => i.cb === cb);
@@ -846,22 +868,36 @@ async function handleCallback(ctx) {
       return;
     }
 
-    db.addUsedTopic(telegramId, topic);
-    setState(telegramId, { topic });
-
     const { Markup } = require('telegraf');
     const selected = state.selected_interests || [];
-    const frozenKeyboard = Markup.inlineKeyboard(
-      selected.map(s => {
-        const i = kb.interestsList.find(x => x.cb === s);
-        const label = i ? (s === cb ? `✅ ${i.text} ${i.emoji}` : `${i.text} ${i.emoji}`) : s;
-        return [Markup.button.callback(label, 'noop')];
-      })
-    );
-    await ctx.editMessageReplyMarkup(frozenKeyboard.reply_markup);
+    const refined = state.refined_topics || [];
 
-    await ctx.reply('Для какой соцсети готовим посты?', kb.socialKeyboard);
-    setStep(telegramId, 'ask_social');
+    // Переключаем выбор (toggle)
+    const idx = refined.indexOf(topic);
+    if (idx === -1) {
+      if (refined.length >= 2) {
+        await ctx.answerCbQuery('Можно выбрать не больше 2 тем', { show_alert: true });
+        return;
+      }
+      refined.push(topic);
+    } else {
+      refined.splice(idx, 1);
+    }
+    setState(telegramId, { refined_topics: refined });
+
+    // Обновляем клавиатуру с галочками
+    const updatedKeyboard = Markup.inlineKeyboard([
+      ...selected.map(s => {
+        const i = kb.interestsList.find(x => x.cb === s);
+        const label = i
+          ? (refined.includes(i.text) ? `✅ ${i.text} ${i.emoji}` : `${i.text} ${i.emoji}`)
+          : s;
+        return [Markup.button.callback(label, `pick_topic_${s}`)];
+      }),
+      [Markup.button.callback('— — — — — — — — —', 'noop')],
+      [Markup.button.callback('✅ Готово — писать посты!', 'refined_done')]
+    ]);
+    await ctx.editMessageReplyMarkup(updatedKeyboard.reply_markup);
     return;
   }
 
