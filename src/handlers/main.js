@@ -1,6 +1,6 @@
 const { getState, setState, clearState, setStep, getStep } = require('../services/state');
 const db = require('../models/db');
-const { generatePost, regeneratePost } = require('../services/gigachat');
+const { generatePost, regeneratePost, synthesizeTopic } = require('../services/gigachat');
 const kb = require('../utils/keyboards');
 const TOPIC_LABELS = kb.TOPIC_LABELS;
 
@@ -738,37 +738,95 @@ async function handleCallback(ctx) {
     const interestLabels = selected.map(cb => {
       const item = kb.interestsList.find(i => i.cb === cb);
       return item ? item.text : cb;
-    }).join(', ');
+    });
 
-    db.updateUser(telegramId, { interests: interestLabels });
-    setState(telegramId, { interests: interestLabels });
+    db.updateUser(telegramId, { interests: interestLabels.join(', ') });
+    setState(telegramId, { interests: interestLabels.join(', ') });
 
+    // Замораживаем клавиатуру интересов
     await ctx.editMessageReplyMarkup(kb.buildInterestsKeyboard(selected, true).reply_markup);
 
     if (selected.length === 1) {
+      // Одна тема — сразу идём дальше
       const item = kb.interestsList.find(i => i.cb === selected[0]);
-      const autoTopic = item ? item.text : interestLabels;
+      const autoTopic = item ? item.text : interestLabels[0];
       db.addUsedTopic(telegramId, autoTopic);
       setState(telegramId, { topic: autoTopic });
       await ctx.reply('Для какой соцсети готовим посты?', kb.socialKeyboard);
       setStep(telegramId, 'ask_social');
     } else {
-      const { Markup } = require('telegraf');
-      const topicKeyboard = Markup.inlineKeyboard(
-        selected.map(cb => {
-          const item = kb.interestsList.find(i => i.cb === cb);
-          return [Markup.button.callback(
-            item ? `${item.text} ${item.emoji}` : cb,
-            `pick_topic_${cb}`
-          )];
-        })
-      );
-      await ctx.reply(
-        '✅ Записал!\n\nТеперь выбери *одну тему* — о чём пишем посты прямо сейчас:',
-        { parse_mode: 'Markdown', ...topicKeyboard }
-      );
-      setStep(telegramId, 'pick_topic');
+      // Несколько тем — просим GigaChat объединить в одну формулировку
+      const loadingMsg = await ctx.reply('🔄 Анализирую твои интересы...');
+      try {
+        const synthesized = await synthesizeTopic(interestLabels);
+        await ctx.telegram.deleteMessage(telegramId, loadingMsg.message_id).catch(() => {});
+
+        setState(telegramId, { synthesized_topic: synthesized });
+
+        const { Markup } = require('telegraf');
+        const confirmKeyboard = Markup.inlineKeyboard([
+          [Markup.button.callback('✅ Да, именно это!', 'topic_confirm')],
+          [Markup.button.callback('🎯 Хочу точнее — выбрать 1-2 темы', 'topic_refine')]
+        ]);
+
+        await ctx.reply(
+          `${synthesized}\n\nПисать посты об этом?`,
+          { parse_mode: 'Markdown', ...confirmKeyboard }
+        );
+        setStep(telegramId, 'confirm_topic');
+      } catch (e) {
+        console.error('Ошибка synthesizeTopic:', e.message);
+        await ctx.telegram.deleteMessage(telegramId, loadingMsg.message_id).catch(() => {});
+        // Fallback — показываем темы для выбора
+        const { Markup } = require('telegraf');
+        const topicKeyboard = Markup.inlineKeyboard(
+          selected.map(cb => {
+            const item = kb.interestsList.find(i => i.cb === cb);
+            return [Markup.button.callback(
+              item ? `${item.text} ${item.emoji}` : cb,
+              `pick_topic_${cb}`
+            )];
+          })
+        );
+        await ctx.reply(
+          'Выбери одну тему — о чём пишем посты прямо сейчас:',
+          topicKeyboard
+        );
+        setStep(telegramId, 'pick_topic');
+      }
     }
+    return;
+  }
+
+  // Подтверждение объединённой темы
+  if (data === 'topic_confirm') {
+    const synthesized = state.synthesized_topic || state.interests;
+    db.addUsedTopic(telegramId, synthesized);
+    setState(telegramId, { topic: synthesized });
+    await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
+    await ctx.reply('Для какой соцсети готовим посты?', kb.socialKeyboard);
+    setStep(telegramId, 'ask_social');
+    return;
+  }
+
+  // Хочет уточнить — показываем его темы, просим выбрать 1-2
+  if (data === 'topic_refine') {
+    const selected = state.selected_interests || [];
+    const { Markup } = require('telegraf');
+    const topicKeyboard = Markup.inlineKeyboard([
+      ...selected.map(cb => {
+        const item = kb.interestsList.find(i => i.cb === cb);
+        return [Markup.button.callback(
+          item ? `${item.text} ${item.emoji}` : cb,
+          `pick_topic_${cb}`
+        )];
+      })
+    ]);
+    await ctx.editMessageText(
+      'Выбери 1-2 темы которые сейчас важнее всего — о них и напишем:',
+      topicKeyboard
+    );
+    setStep(telegramId, 'pick_topic');
     return;
   }
 
