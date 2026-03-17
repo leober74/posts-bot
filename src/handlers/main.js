@@ -770,7 +770,7 @@ async function handleCallback(ctx) {
         ]);
 
         await ctx.reply(
-          `${synthesized}\n\nПисать посты об этом?`,
+          `${interestLabels.join(' + ')} → _${synthesized}_\n\nПисать посты об этом?`,
           { parse_mode: 'Markdown', ...confirmKeyboard }
         );
         setStep(telegramId, 'confirm_topic');
