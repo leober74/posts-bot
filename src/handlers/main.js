@@ -678,8 +678,8 @@ async function handleCallback(ctx) {
 
     if (state.user_type === 'personal' || (!state.user_type && !state.segment?.includes('business'))) {
       await ctx.editMessageText(
-        'Что тебе близко в жизни?\n_(можно выбрать несколько вариантов)_\n\nПотом уточним о чём именно пишем:',
-        { parse_mode: 'Markdown', ...kb.buildInterestsKeyboard([]) }
+        'Что тебе близко в жизни? (можно выбрать несколько)\n\nПотом уточним о чём именно пишем:',
+        kb.buildInterestsKeyboard([])
       );
       setState(telegramId, { selected_interests: [] });
       setStep(telegramId, 'ask_interests');
@@ -688,8 +688,8 @@ async function handleCallback(ctx) {
       setStep(telegramId, 'ask_business_desc');
     } else {
       await ctx.editMessageText(
-        'Что тебе близко в жизни?\n_(можно выбрать несколько вариантов)_\n\nПотом уточним о чём именно пишем:',
-        { parse_mode: 'Markdown', ...kb.buildInterestsKeyboard([]) }
+        'Что тебе близко в жизни? (можно выбрать несколько)\n\nПотом уточним о чём именно пишем:',
+        kb.buildInterestsKeyboard([])
       );
       setState(telegramId, { selected_interests: [] });
       setStep(telegramId, 'ask_interests');
@@ -704,8 +704,8 @@ async function handleCallback(ctx) {
     setState(telegramId, { gender });
     if (state.user_type === 'personal') {
       await ctx.editMessageText(
-        'Что тебе близко в жизни?\n_(можно выбрать несколько вариантов)_\n\nПотом уточним о чём именно пишем:',
-        { parse_mode: 'Markdown', ...kb.buildInterestsKeyboard([]) }
+        'Что тебе близко в жизни? (можно выбрать несколько)\n\nПотом уточним о чём именно пишем:',
+        kb.buildInterestsKeyboard([])
       );
       setState(telegramId, { selected_interests: [] });
       setStep(telegramId, 'ask_interests');
