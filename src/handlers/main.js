@@ -775,7 +775,7 @@ async function handleCallback(ctx) {
         );
         setStep(telegramId, 'confirm_topic');
       } catch (e) {
-        console.error('Ошибка synthesizeTopic:', e.message);
+        console.error('Ошибка synthesizeTopic:', e.message, e.response?.data || '');
         await ctx.telegram.deleteMessage(telegramId, loadingMsg.message_id).catch(() => {});
         // Fallback — показываем темы для выбора
         const { Markup } = require('telegraf');
@@ -826,7 +826,7 @@ async function handleCallback(ctx) {
         )];
       }),
       [Markup.button.callback('— — — — — — — — —', 'noop')],
-      [Markup.button.callback('✅ Готово — писать посты!', 'refined_done')]
+      [Markup.button.callback('Готово — писать посты! →', 'refined_done')]
     ]);
     await ctx.editMessageText(
       'Выбери 1-2 темы которые сейчас важнее всего — о них и напишем:',
@@ -846,7 +846,8 @@ async function handleCallback(ctx) {
     const topicLabel = refined.join(' + ');
     db.addUsedTopic(telegramId, topicLabel);
     setState(telegramId, { topic: topicLabel });
-    await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
+    // Удаляем сообщение с выбором тем
+    await ctx.deleteMessage().catch(() => {});
     await ctx.reply('Для какой соцсети готовим посты?', kb.socialKeyboard);
     setStep(telegramId, 'ask_social');
     return;
@@ -895,7 +896,7 @@ async function handleCallback(ctx) {
         return [Markup.button.callback(label, `pick_topic_${s}`)];
       }),
       [Markup.button.callback('— — — — — — — — —', 'noop')],
-      [Markup.button.callback('✅ Готово — писать посты!', 'refined_done')]
+      [Markup.button.callback('Готово — писать посты! →', 'refined_done')]
     ]);
     await ctx.editMessageReplyMarkup(updatedKeyboard.reply_markup);
     return;
