@@ -186,4 +186,40 @@ ${basePrompt}
   return response.data.choices[0].message.content.trim();
 }
 
-module.exports = { generatePost, regeneratePost };
+// ─── Объединяем несколько тем в одну формулировку ────────
+async function synthesizeTopic(topics) {
+  const token = await getAccessToken();
+
+  const prompt = `Человек выбрал несколько тем которые ему близки в жизни: ${topics.join(', ')}.
+
+Твоя задача — найти общий смысл между этими темами и сформулировать его в одной короткой фразе (5-10 слов).
+
+Правила:
+- Начни с "Похоже, тебе близко" или "Судя по всему, тебе важно" — выбери что звучит естественнее
+- Фраза должна объединять суть всех тем, а не просто перечислять их
+- Пиши живо и по-человечески, без канцелярита
+- Только одна фраза, без пояснений и точки в конце
+
+Верни ТОЛЬКО одну фразу. Без кавычек, без пояснений.`;
+
+  const response = await axios.post(
+    'https://gigachat.devices.sberbank.ru/api/v1/chat/completions',
+    {
+      model: 'GigaChat',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+      max_tokens: 100
+    },
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false })
+    }
+  );
+
+  return response.data.choices[0].message.content.trim();
+}
+
+module.exports = { generatePost, regeneratePost, synthesizeTopic };
