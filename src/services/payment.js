@@ -8,7 +8,6 @@ const CUSTOMER_CODE = process.env.TOCHKA_CUSTOMER_CODE || '300853337';
 function getToken() { return process.env.TOCHKA_TOKEN; }
 function getClientId() { return process.env.TOCHKA_CLIENT_ID; }
 
-// Регистрируем webhook при старте
 async function registerWebhook(botUrl) {
   try {
     const clientId = getClientId();
@@ -39,7 +38,6 @@ async function registerWebhook(botUrl) {
   }
 }
 
-// Генерируем уникальную платёжную ссылку для пользователя
 async function createPaymentLink(telegramId) {
   try {
     const response = await axios.post(
@@ -48,7 +46,7 @@ async function createPaymentLink(telegramId) {
         customerCode: CUSTOMER_CODE,
         amount: 100,
         purpose: 'Подписка на бота (1 месяц)',
-        consumerId: String(telegramId), // Telegram ID пользователя
+        consumerId: String(telegramId),
         redirectUrl: 'https://t.me/universal_posts_bot',
         saveCard: false
       },
@@ -66,10 +64,8 @@ async function createPaymentLink(telegramId) {
   }
 }
 
-// Обработка webhook от Точки
 async function handlePaymentWebhook(bot, jwtToken) {
   try {
-    // Декодируем JWT без проверки подписи (payload — вторая часть)
     const parts = jwtToken.split('.');
     if (parts.length < 2) throw new Error('Неверный JWT');
 
@@ -93,24 +89,21 @@ async function handlePaymentWebhook(bot, jwtToken) {
       return false;
     }
 
-    // Активируем подписку
     const user = db.getUser(telegramId);
     if (!user) {
       console.error(`Webhook: пользователь ${telegramId} не найден`);
       return false;
     }
 
-    db.updateUser(telegramId, {
-      status: 'subscribed',
-      subscription_until: getNextMonthDate()
-    });
+    // ✅ Используем activateSubscription — она сама ставит дату +30 дней
+    const untilDate = db.activateSubscription(telegramId);
+    const untilFormatted = new Date(untilDate).toLocaleDateString('ru-RU');
 
     // Начисляем реферальный бонус
     if (user.referred_by) {
       const referrer = db.getUserByRefCode(user.referred_by);
       if (referrer) {
         db.addBalance(referrer.telegram_id, 10);
-        // Уведомляем реферера
         await bot.telegram.sendMessage(
           referrer.telegram_id,
           `🎉 По твоей ссылке кто-то оформил подписку!\n\n+10 руб начислено на твой баланс 💰`
@@ -122,24 +115,27 @@ async function handlePaymentWebhook(bot, jwtToken) {
     await bot.telegram.sendMessage(
       telegramId,
       `✅ *Подписка активирована!*\n\n` +
+      `Действует до: *${untilFormatted}*\n\n` +
       `Теперь у тебя:\n` +
       `• Неограниченные генерации по всем темам\n` +
       `• Повторная генерация уже использованных тем\n` +
+      `• Реферальные начисления за приглашённых\n` +
       `• Все будущие функции автоматически\n\n` +
       `Напиши /start чтобы начать 🚀`,
       { parse_mode: 'Markdown' }
     ).catch(() => {});
 
-    // Уведомляем тебя (админа)
+    // Уведомляем админа
     await bot.telegram.sendMessage(
       process.env.ADMIN_CHAT_ID,
       `💳 НОВАЯ ОПЛАТА!\n\n` +
       `👤 @${user.username || telegramId}\n` +
       `💰 Сумма: ${amount} руб\n` +
-      `✅ Подписка активирована`
+      `📅 Подписка до: ${untilFormatted}\n` +
+      `✅ Активировано`
     ).catch(() => {});
 
-    console.log(`✅ Подписка активирована для ${telegramId}`);
+    console.log(`✅ Подписка активирована для ${telegramId} до ${untilFormatted}`);
     return true;
 
   } catch (e) {
@@ -148,11 +144,4 @@ async function handlePaymentWebhook(bot, jwtToken) {
   }
 }
 
-function getNextMonthDate() {
-  const d = new Date();
-  d.setMonth(d.getMonth() + 1);
-  return d.toISOString();
-}
-
 module.exports = { createPaymentLink, handlePaymentWebhook, registerWebhook };
-
