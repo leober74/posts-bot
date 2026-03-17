@@ -421,7 +421,6 @@ async function handleCallback(ctx) {
 
   // ─── Фильтр партнёров Shop ────────────────────────────────
   if (data === 'pf_has_partner') {
-    // Уже в партнёрской программе — скрываем Shop, ведём к другим темам
     db.updateUser(telegramId, { segment: 'noshop' });
     setState(telegramId, { segment: 'noshop' });
     await ctx.editMessageText(
@@ -432,7 +431,6 @@ async function handleCallback(ctx) {
   }
 
   if (data === 'pf_no_partner') {
-    // Не в партнёрской программе — показываем всё
     db.updateUser(telegramId, { segment: 'general' });
     setState(telegramId, { segment: 'general' });
     await ctx.editMessageText(
@@ -443,7 +441,6 @@ async function handleCallback(ctx) {
   }
 
   if (data === 'pf_has_business') {
-    // Есть свой бизнес — направляем в бизнес-ветку
     db.updateUser(telegramId, { segment: 'business', user_type: 'business' });
     setState(telegramId, { segment: 'business', user_type: 'business' });
     await ctx.editMessageText(
@@ -472,7 +469,6 @@ async function handleCallback(ctx) {
   }
 
   if (data === 'pilot_later') {
-    // Переходим к генерации постов
     await ctx.editMessageText(
       '👍 Понял! Когда будешь готов — просто напиши /start и вернёмся к этому.\n\nА пока давай сделаем посты которые привлекут новых партнёров в твою сеть 💪\n\nКак тебя зовут?'
     );
@@ -494,14 +490,11 @@ async function handleCallback(ctx) {
       '1️⃣ *Расскажи коротко — чем занимается твой бизнес?*\n\nНапиши 2-3 предложения: что продаёшь, кому, как давно работаешь.',
       { parse_mode: 'Markdown' }
     );
-    setStep(telegramId, 'interview_problem');
-    // Используем interview_problem для описания бизнеса — переопределяем шаг
     setStep(telegramId, 'ask_business_interview');
     return;
   }
 
   if (data === 'interview_skip') {
-    // Пропустили интервью — сразу к квалификации
     await ctx.editMessageText(
       '✅ *Твой бизнес оформлен юридически (ИП или ООО)?*',
       { parse_mode: 'Markdown', ...kb.qualLegalKeyboard }
@@ -556,14 +549,12 @@ async function handleCallback(ctx) {
     const step = getStep(telegramId);
 
     if (step === 'interview_nps') {
-      // Интервью — просим комментарий
       await ctx.editMessageText(
         `Оценка ${score}/10 — записал! 🙏\n\nНапиши коротко *почему именно такая оценка*? (можно 1 предложение)`,
         { parse_mode: 'Markdown' }
       );
       setStep(telegramId, 'interview_nps_comment');
     } else {
-      // NPS для обычных пользователей
       db.saveNPS(telegramId, 'personal', score, '');
       const msg = score >= 9
         ? '🔥 Спасибо! Ты промоутер — это лучший комплимент!'
@@ -572,9 +563,8 @@ async function handleCallback(ctx) {
         : '🙏 Спасибо за честность — будем работать над улучшением!';
       await ctx.editMessageText(msg);
 
-      // Показываем реферальную ссылку как призыв к действию
       const user = db.getUser(telegramId);
-      const refLink = `https://t.me/${ctx.botInfo.username}?start=${user.referral_code}`;
+      const refLink = `https://t.me/universal_posts_bot?start=${user.referral_code}`;
       await ctx.reply(
         `🎁 Кстати — за каждого друга которого пригласишь получишь *10%* от его оплаты!\n\nТвоя ссылка:\n\`${refLink}\``,
         { parse_mode: 'Markdown' }
@@ -616,7 +606,6 @@ async function handleCallback(ctx) {
   }
 
   if (data === 'qual_legal_no') {
-    // Нет юрлица — мягко переводим в личный бренд
     db.updateUser(telegramId, { user_type: 'personal' });
     setState(telegramId, { user_type: 'personal', qual_redirected: true });
     await ctx.editMessageText(
@@ -643,13 +632,11 @@ async function handleCallback(ctx) {
     const isMid = data === 'qual_rev_mid' || repeat === 'qual_repeat_mid';
 
     if (isStrong || isMid) {
-      // Сильный бизнес — полная бизнес-ветка
       setState(telegramId, { qual_revenue: data, user_type: 'business' });
       await ctx.editMessageText(
         '🚀 Отлично! У тебя зрелый бизнес с потенциалом для партнёрской сети.\n\nЯ помогу создать посты которые привлекут сильных партнёров — владельцев своих каналов продаж.\n\nКак тебя зовут?'
       );
     } else {
-      // Слабые показатели — переводим в личный бренд
       db.updateUser(telegramId, { user_type: 'personal' });
       setState(telegramId, { qual_revenue: data, user_type: 'personal', qual_redirected: true });
       await ctx.editMessageText(
@@ -691,7 +678,7 @@ async function handleCallback(ctx) {
     return;
   }
 
-  // Пол (оставляем на случай если понадобится в будущем, но не показываем)
+  // Пол
   if (data.startsWith('gender_')) {
     const gender = data === 'gender_male' ? 'Мужской' : 'Женский';
     db.updateUser(telegramId, { gender });
@@ -710,7 +697,7 @@ async function handleCallback(ctx) {
     return;
   }
 
-  // Интересы (мультивыбор — выбираешь несколько, потом одну тему)
+  // Интересы (мультивыбор)
   if (data.startsWith('int_')) {
     const selected = state.selected_interests || [];
     const idx = selected.indexOf(data);
@@ -737,10 +724,8 @@ async function handleCallback(ctx) {
     db.updateUser(telegramId, { interests: interestLabels });
     setState(telegramId, { interests: interestLabels });
 
-    // Замораживаем клавиатуру интересов
     await ctx.editMessageReplyMarkup(kb.buildInterestsKeyboard(selected, true).reply_markup);
 
-    // Если один интерес — берём сразу как тему
     if (selected.length === 1) {
       const item = kb.interestsList.find(i => i.cb === selected[0]);
       const autoTopic = item ? item.text : interestLabels;
@@ -749,7 +734,6 @@ async function handleCallback(ctx) {
       await ctx.reply('Для какой соцсети готовим посты?', kb.socialKeyboard);
       setStep(telegramId, 'ask_social');
     } else {
-      // Несколько — спрашиваем о чём пишем
       const { Markup } = require('telegraf');
       const topicKeyboard = Markup.inlineKeyboard(
         selected.map(cb => {
@@ -788,7 +772,6 @@ async function handleCallback(ctx) {
     db.addUsedTopic(telegramId, topic);
     setState(telegramId, { topic });
 
-    // Замораживаем с галочкой
     const { Markup } = require('telegraf');
     const selected = state.selected_interests || [];
     const frozenKeyboard = Markup.inlineKeyboard(
@@ -822,13 +805,12 @@ async function handleCallback(ctx) {
     db.addUsedTopic(telegramId, topicLabel);
     setState(telegramId, { topic: topicLabel });
 
-    // Показываем кнопки с галочкой на выбранной, остальные — noop
     const { Markup } = require('telegraf');
     const frozenKeyboard = Markup.inlineKeyboard(
       Object.entries(TOPIC_LABELS).map(([cb, label]) => [
         Markup.button.callback(
           label === topicLabel ? `✅ ${label}` : label,
-          label === topicLabel ? 'noop' : 'noop'
+          'noop'
         )
       ])
     );
@@ -869,7 +851,6 @@ async function handleCallback(ctx) {
     const snMap = { sn_vk: 'ВКонтакте', sn_tg: 'Telegram', sn_ig: 'Instagram' };
 
     if (data === 'sn_other') {
-      // Просим ввести название соцсети текстом
       await ctx.editMessageText('Напиши название своей соцсети (например: Одноклассники, LinkedIn, Дзен, Threads):');
       setStep(telegramId, 'ask_social_other');
       return;
@@ -926,7 +907,7 @@ async function handleCallback(ctx) {
     return;
   }
 
-  // Продолжить (после проверки профиля)
+  // Продолжить
   if (data === 'continue') {
     await startGeneration(ctx);
     return;
@@ -946,10 +927,8 @@ async function handleCallback(ctx) {
       const currentIdx = state.current_post_index || 0;
       const nextIdx = currentIdx + 1;
 
-      // Убираем кнопки оценки — без восторженных фраз
       await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
 
-      // Инструкция — только после первого поста
       if (currentIdx === 0) {
         const guides = {
           'ВКонтакте': '📋 *Как опубликовать во ВКонтакте:*\n1. Скопируй текст поста выше (зажми → Копировать)\n2. Открой ВКонтакте → нажми "Что у меня нового?"\n3. Вставь текст\n4. Добавь фото по желанию\n5. Нажми "Опубликовать" ✅',
@@ -971,7 +950,6 @@ async function handleCallback(ctx) {
       }
 
     } else {
-      // Оценка 1, 2 или 3 — спрашиваем причину
       const messages = {
         1: '😞 Совсем не то? Давай разберёмся и переделаем полностью.\n\n*Что именно не понравилось?*',
         2: '🤔 Понял, есть над чем поработать.\n\n*Что мешает опубликовать этот пост?*',
@@ -1017,7 +995,6 @@ async function handleCallback(ctx) {
       const genId = db.saveGeneration(telegramId, state.current_post_type, userData.topic, userData.social_network, newPost);
       setState(telegramId, { current_gen_id: genId, regen_count: regenCount });
 
-      // Удаляем предыдущий пост
       if (state.current_post_msg_id) {
         await ctx.telegram.deleteMessage(telegramId, state.current_post_msg_id).catch(() => {});
       }
@@ -1111,15 +1088,13 @@ async function showCalculatorResult(ctx) {
   const rate = state.calc_rate || 1500;
   const hasErrors = state.calc_errors || false;
 
-  // Расчёт потерь
   const monthlyCost = Math.round(hours * rate);
   const yearlyCost = monthlyCost * 12;
-  const errorCost = hasErrors ? Math.round(partners * 500) : 0; // ~500 руб риск на партнёра при ошибках
+  const errorCost = hasErrors ? Math.round(partners * 500) : 0;
   const totalMonthly = monthlyCost + errorCost;
 
-  // Мини-демо расчёта
-  const demoLevel1 = 10; // % первого уровня для демо
-  const demoSale = 10000; // средняя сделка
+  const demoLevel1 = 10;
+  const demoSale = 10000;
   const demoBonus = Math.round(demoSale * demoLevel1 / 100);
 
   setState(telegramId, {
@@ -1128,7 +1103,6 @@ async function showCalculatorResult(ctx) {
     interview_desc: `Партнёров: ${partners}, уровней: ${levels}`
   });
 
-  // Сохраняем в интервью
   db.saveInterview(telegramId, {
     business_desc: `Партнёров: ${partners}, уровней: ${levels}`,
     main_problem: `Часов на расчёты: ${hours}/мес, ошибки: ${hasErrors ? 'да' : 'нет'}`,
@@ -1156,7 +1130,6 @@ async function showCalculatorResult(ctx) {
     { parse_mode: 'Markdown' }
   );
 
-  // Небольшая пауза перед следующим сообщением
   setTimeout(async () => {
     await ctx.reply(
       `🎯 *Предложение:*\n\n` +
@@ -1193,21 +1166,20 @@ async function generateNextPost(ctx, index) {
 
   try {
     const userData = buildUserData(user, state);
-    userData.botUsername = ctx.botInfo?.username || 'universal_posts_bot';
+    // ИСПРАВЛЕНО: хардкодим правильный username вместо ctx.botInfo
+    userData.botUsername = 'universal_posts_bot';
     const post = await generatePost(postType, userData);
     const genId = db.saveGeneration(telegramId, postType, userData.topic, userData.social_network, post);
     setState(telegramId, { current_gen_id: genId });
 
     await ctx.telegram.deleteMessage(telegramId, loadingMsg.message_id).catch(() => {});
 
-    // Делаем первую строку жирной
     const formattedPost = formatPost(post);
 
     const postMsg = await ctx.reply(
       `📝 *Пост ${index + 1} из 4 — ${postType.toUpperCase()}*\n\n${formattedPost}\n\n⭐️ Оцени пост:`,
       { parse_mode: 'Markdown', ...kb.ratingKeyboard(genId) }
     );
-    // Сохраняем message_id чтобы удалить при перегенерации
     setState(telegramId, { current_post_msg_id: postMsg.message_id });
   } catch (e) {
     console.error('Ошибка генерации:', e.message);
@@ -1223,10 +1195,8 @@ async function generateNextPost(ctx, index) {
 async function showFinalScreen(ctx) {
   const telegramId = ctx.from.id;
   const user = db.getUser(telegramId);
-  const refLink = `https://t.me/${ctx.botInfo.username}?start=${user.referral_code}`;
-  const segment = user.segment || state?.segment || 'general';
+  const refLink = `https://t.me/universal_posts_bot?start=${user.referral_code}`;
 
-  // Финальный экран для бизнес-сегмента — воронка Deepinvol
   if (user.user_type === 'business') {
     await ctx.reply(
       `✅ Все 4 поста готовы!\n\nТеперь главное — когда партнёры начнут откликаться на твои посты, тебе понадобится система для работы с ними: онбординг, обучение, выплаты комиссий.\n\n*Мы строим именно такую платформу — Deepinvol.*\n\nСейчас набираем первых 20 компаний на особых условиях входа. Хочешь попасть в список?`,
@@ -1239,7 +1209,6 @@ async function showFinalScreen(ctx) {
     );
   }
 
-  // Объяснение вирального механизма
   await ctx.reply(
     `💡 *Как твои посты приводят новых читателей в бота*\n\n` +
     `В каждый пост мы незаметно вшиваем приглашение — последняя строка со ссылкой на бота.\n\n` +
@@ -1265,7 +1234,7 @@ async function showFinalScreen(ctx) {
 
 // ─── Вспомогательные ─────────────────────────────────────
 function buildUserData(user, state) {
-  const u = user || {}; // защита от undefined
+  const u = user || {};
   return {
     name: u.name || state.name || 'автор',
     age: u.age || state.age,
@@ -1306,7 +1275,6 @@ async function handleAdmin(ctx) {
     ? s.topReferrers.map(r => `  • ${r.name || r.username || r.telegram_id}: ${r.referrals} чел. (платящих: ${r.paid_referrals})`).join('\n')
     : '  Пока нет';
 
-  // WTP анализ из интервью
   const wtpYesCounts = {};
   interviews.forEach(i => { if (i.wtp_yes) wtpYesCounts[i.wtp_yes] = (wtpYesCounts[i.wtp_yes] || 0) + 1; });
   const wtpTop = Object.entries(wtpYesCounts).sort((a,b) => b[1]-a[1]).map(([k,v]) => `  • ${k}: ${v} чел.`).join('\n') || '  Пока нет';
