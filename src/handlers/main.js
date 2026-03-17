@@ -846,8 +846,20 @@ async function handleCallback(ctx) {
     const topicLabel = refined.join(' + ');
     db.addUsedTopic(telegramId, topicLabel);
     setState(telegramId, { topic: topicLabel });
-    // Удаляем сообщение с выбором тем
-    await ctx.deleteMessage().catch(() => {});
+
+    // Замораживаем список — показываем что выбрал, но некликабельно
+    const { Markup } = require('telegraf');
+    const selected = state.selected_interests || [];
+    const frozenKeyboard = Markup.inlineKeyboard(
+      selected.map(s => {
+        const i = kb.interestsList.find(x => x.cb === s);
+        const label = i
+          ? (refined.includes(i.text) ? `✅ ${i.text} ${i.emoji}` : `${i.text} ${i.emoji}`)
+          : s;
+        return [Markup.button.callback(label, 'noop')];
+      })
+    );
+    await ctx.editMessageReplyMarkup(frozenKeyboard.reply_markup).catch(() => {});
     await ctx.reply('Для какой соцсети готовим посты?', kb.socialKeyboard);
     setStep(telegramId, 'ask_social');
     return;
