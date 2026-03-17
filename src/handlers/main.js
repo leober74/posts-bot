@@ -237,15 +237,28 @@ async function handleTextInput(ctx) {
     try {
       const user = db.getUser(telegramId);
       const userData = buildUserData(user, state);
-      const newPost = await regeneratePost(state.current_post_type, userData, text);
+      const regenCount = (state.regen_count || 0) + 1;
+      const newPost = await regeneratePost(state.current_post_type, userData, text, regenCount);
       const genId = db.saveGeneration(telegramId, state.current_post_type, userData.topic, userData.social_network, newPost);
-      setState(telegramId, { current_gen_id: genId, regen_count: (state.regen_count || 0) + 1 });
-      await ctx.reply(
-        `📝 *${state.current_post_type.toUpperCase()}*\n\n${newPost}`,
+      setState(telegramId, { current_gen_id: genId, regen_count: regenCount });
+
+      // Удаляем предыдущий пост
+      if (state.current_post_msg_id) {
+        await ctx.telegram.deleteMessage(telegramId, state.current_post_msg_id).catch(() => {});
+      }
+
+      const postMsg = await ctx.reply(
+        `📝 *${state.current_post_type.toUpperCase()}* — вариант ${regenCount + 1}\n\n${formatPost(newPost)}\n\n⭐️ Оцени:`,
         { parse_mode: 'Markdown', ...kb.ratingKeyboard(genId) }
       );
+      setState(telegramId, { current_post_msg_id: postMsg.message_id });
     } catch (e) {
-      await ctx.reply('Произошла ошибка при генерации. Попробуй ещё раз /start');
+      console.error('Ошибка перегенерации (custom):', e.message);
+      const { Markup } = require('telegraf');
+      await ctx.reply(
+        '⚠️ GigaChat не ответил — попробуй ещё раз',
+        Markup.inlineKeyboard([[Markup.button.callback('🔄 Попробовать ещё раз', 'fb_custom')]])
+      );
     }
     return;
   }
