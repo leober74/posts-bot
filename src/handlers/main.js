@@ -1172,28 +1172,43 @@ async function handleCallback(ctx) {
 
   // Финальные кнопки
   if (data === 'subscribe') {
-    const { createPaymentLink } = require('../services/payment');
-    const payLink = await createPaymentLink(telegramId) ||
-      'https://checkout.tochka.com/09495d68-9066-4f07-8349-fe75292f7b86';
+    try {
+      const { createPaymentLink } = require('../services/payment');
+      const payLink = await createPaymentLink(telegramId) ||
+        'https://checkout.tochka.com/09495d68-9066-4f07-8349-fe75292f7b86';
 
-    await ctx.editMessageText(
-      '💎 *Подписка 100 руб/мес*\n\n' +
-      'Включает:\n' +
-      '• Неограниченные генерации по всем темам\n' +
-      '• Повторная генерация уже использованных тем\n' +
-      '• Картинка к посту (AI-генерация)\n' +
-      '• A/B тестирование заголовков\n' +
-      '• Аналитика — какие посты получают больше отклика\n' +
-      '• Статистика заработка по реферальной программе\n' +
-      '• Приоритетная поддержка',
-      {
-        parse_mode: 'Markdown',
-        ...require('telegraf').Markup.inlineKeyboard([
-          [require('telegraf').Markup.button.url('💳 Оплатить 100 руб', payLink)],
-          [require('telegraf').Markup.button.url('💬 Задать вопрос', 'https://t.me/leonid.berenshtein')]
-        ])
-      }
-    );
+      await ctx.editMessageText(
+        '💎 *Подписка 100 руб/мес*\n\n' +
+        'Включает:\n' +
+        '• Неограниченные генерации по всем темам\n' +
+        '• Повторная генерация уже использованных тем\n' +
+        '• Картинка к посту (AI-генерация)\n' +
+        '• A/B тестирование заголовков\n' +
+        '• Аналитика — какие посты получают больше отклика\n' +
+        '• Статистика заработка по реферальной программе\n' +
+        '• Приоритетная поддержка',
+        {
+          parse_mode: 'Markdown',
+          ...require('telegraf').Markup.inlineKeyboard([
+            [require('telegraf').Markup.button.url('💳 Оплатить 100 руб', payLink)],
+            [require('telegraf').Markup.button.url('💬 Задать вопрос', 'https://t.me/leonid.berenshtein')]
+          ])
+        }
+      );
+    } catch (e) {
+      console.error('Ошибка subscribe:', e.message);
+      const fallbackLink = 'https://checkout.tochka.com/09495d68-9066-4f07-8349-fe75292f7b86';
+      await ctx.reply(
+        '💎 *Подписка 100 руб/мес*\n\nНажми кнопку ниже для оплаты:',
+        {
+          parse_mode: 'Markdown',
+          ...require('telegraf').Markup.inlineKeyboard([
+            [require('telegraf').Markup.button.url('💳 Оплатить 100 руб', fallbackLink)],
+            [require('telegraf').Markup.button.url('💬 Задать вопрос', 'https://t.me/leonid.berenshtein')]
+          ])
+        }
+      );
+    }
     return;
   }
 
@@ -1335,6 +1350,12 @@ async function generateNextPost(ctx, index) {
 async function showFinalScreen(ctx) {
   const telegramId = ctx.from.id;
   const user = db.getUser(telegramId);
+
+  if (!user) {
+    await ctx.reply('Что-то пошло не так. Попробуй /start');
+    return;
+  }
+
   const refLink = `https://t.me/universal_posts_bot?start=${user.referral_code}`;
 
   if (user.user_type === 'business') {
