@@ -107,6 +107,11 @@ async function checkSubscriptions() {
   }
 }
 
+console.log('🚀 Запускаем бот...');
+console.log(`🔑 BOT_TOKEN задан: ${!!process.env.BOT_TOKEN}`);
+console.log(`🔑 TOCHKA_TOKEN задан: ${!!process.env.TOCHKA_TOKEN}`);
+console.log(`🔑 TOCHKA_CLIENT_ID задан: ${!!process.env.TOCHKA_CLIENT_ID}`);
+
 // ─── Запуск ───────────────────────────────────────────────
 bot.launch()
   .then(() => {
