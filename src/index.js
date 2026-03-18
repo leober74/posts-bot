@@ -115,6 +115,9 @@ bot.launch()
     app.listen(PORT, () => {
       console.log(`🌐 Webhook сервер запущен на порту ${PORT}`);
       const botUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN || 'web-production-e908a.up.railway.app'}`;
+      console.log(`🔗 Регистрируем webhook на: ${botUrl}/payment/callback`);
+      console.log(`🔑 TOCHKA_TOKEN задан: ${!!process.env.TOCHKA_TOKEN}`);
+      console.log(`🔑 TOCHKA_CLIENT_ID задан: ${!!process.env.TOCHKA_CLIENT_ID}`);
       registerWebhook(botUrl);
     });
 
