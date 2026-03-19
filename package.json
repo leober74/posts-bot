@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "telegraf": "^4.15.3",
-    "gigachat": "^0.0.18"
+    "gigachat": "^0.0.18",
     "axios": "^1.6.0",
     "better-sqlite3": "^9.4.3",
     "dotenv": "^16.3.1",
