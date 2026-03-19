@@ -1,13 +1,19 @@
 const axios = require('axios');
 const { Agent } = require('node:https');
 
+console.log('✅ GigaChat module loaded (новый код с логами)');
+
 const httpsAgent = new Agent({ rejectUnauthorized: false });
 
 let cachedToken = null;
 let tokenExpiry = 0;
 
 async function getAccessToken() {
-  if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
+  console.log('🔄 getAccessToken вызван');
+  if (cachedToken && Date.now() < tokenExpiry) {
+    console.log('🔑 Используем кешированный токен');
+    return cachedToken;
+  }
 
   const auth = Buffer.from(process.env.GIGACHAT_CREDENTIALS).toString('base64');
   console.log('🔑 Requesting token with auth (base64 start):', auth.substring(0, 30) + '...');
@@ -28,6 +34,7 @@ async function getAccessToken() {
       }
     );
     console.log('✅ Token response status:', response.status);
+    console.log('📦 Token response data:', response.data);
     cachedToken = response.data.access_token;
     tokenExpiry = Date.now() + (response.data.expires_at - Date.now()) - 60000;
     return cachedToken;
@@ -43,9 +50,10 @@ async function getAccessToken() {
 }
 
 async function generatePost(prompt) {
+  console.log('📝 generatePost вызван с prompt:', prompt.substring(0, 100));
   try {
     const token = await getAccessToken();
-    console.log('📝 Sending prompt to GigaChat (start):', prompt.substring(0, 100) + '...');
+    console.log('🔑 Токен получен, отправляем запрос к chat/completions');
 
     const response = await axios.post(
       'https://gigachat.devices.sberbank.ru/api/v1/chat/completions',
@@ -65,7 +73,7 @@ async function generatePost(prompt) {
           'Content-Type': 'application/json',
         },
         httpsAgent,
-        timeout: 60000, // увеличен таймаут до 60 секунд
+        timeout: 60000,
       }
     );
     console.log('✅ GigaChat response status:', response.status);
@@ -88,6 +96,7 @@ async function generatePost(prompt) {
 }
 
 async function regeneratePost(originalPrompt, userFeedback) {
+  console.log('🔄 regeneratePost вызван');
   const newPrompt = `Исходный запрос: "${originalPrompt}". Пожелание пользователя: "${userFeedback}". Сгенерируй новый, улучшенный пост с учётом пожеланий.`;
   return generatePost(newPrompt);
 }
