@@ -7,7 +7,6 @@ let cachedToken = null;
 let tokenExpiry = 0;
 
 async function getAccessToken() {
-  // Если токен ещё действителен, возвращаем его
   if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
 
   const auth = Buffer.from(process.env.GIGACHAT_CREDENTIALS).toString('base64');
@@ -19,14 +18,14 @@ async function getAccessToken() {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json',
         'Authorization': `Basic ${auth}`,
-        'RqUID': '1' // можно сгенерировать уникальный, но и так сработает
+        'RqUID': '1'
       },
       httpsAgent,
     }
   );
 
   cachedToken = response.data.access_token;
-  tokenExpiry = Date.now() + (response.data.expires_at - Date.now()) - 60000; // запас 1 минута
+  tokenExpiry = Date.now() + (response.data.expires_at - Date.now()) - 60000;
   return cachedToken;
 }
 
@@ -51,7 +50,7 @@ async function generatePost(prompt) {
           'Content-Type': 'application/json',
         },
         httpsAgent,
-        timeout: 30000, // 30 секунд
+        timeout: 30000,
       }
     );
     return response.data.choices[0]?.message?.content || '';
