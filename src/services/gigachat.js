@@ -1,33 +1,68 @@
-const GigaChat = require('gigachat');
+const axios = require('axios');
 const { Agent } = require('node:https');
 
 const httpsAgent = new Agent({ rejectUnauthorized: false });
 
-const client = new GigaChat({
-  httpsAgent: httpsAgent,
-  timeout: 60,
-});
+let cachedToken = null;
+let tokenExpiry = 0;
+
+async function getAccessToken() {
+  // Если токен ещё действителен, возвращаем его
+  if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
+
+  const auth = Buffer.from(process.env.GIGACHAT_CREDENTIALS).toString('base64');
+  const response = await axios.post(
+    'https://ngw.devices.sberbank.ru:9443/api/v2/oauth',
+    'scope=' + (process.env.GIGACHAT_SCOPE || 'GIGACHAT_API_PERS'),
+    {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'Authorization': `Basic ${auth}`,
+        'RqUID': '1' // можно сгенерировать уникальный, но и так сработает
+      },
+      httpsAgent,
+    }
+  );
+
+  cachedToken = response.data.access_token;
+  tokenExpiry = Date.now() + (response.data.expires_at - Date.now()) - 60000; // запас 1 минута
+  return cachedToken;
+}
 
 async function generatePost(prompt) {
   try {
-    const response = await client.chat({
-      messages: [
-        {
-          role: 'system',
-          content: 'Ты эксперт по нейромаркетингу. Пиши посты по структуре AIDA (крючок, проблема, решение, доказательства, призыв, вопрос).',
+    const token = await getAccessToken();
+    const response = await axios.post(
+      'https://gigachat.devices.sberbank.ru/api/v1/chat/completions',
+      {
+        model: process.env.GIGACHAT_MODEL || 'GigaChat',
+        messages: [
+          {
+            role: 'system',
+            content: 'Ты эксперт по нейромаркетингу. Пиши посты по структуре AIDA (крючок, проблема, решение, доказательства, призыв, вопрос). Используй только факты, не выдумывай. Ответ пиши на русском языке.',
+          },
+          { role: 'user', content: prompt },
+        ],
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
-        { role: 'user', content: prompt },
-      ],
-    });
-    return response.choices[0]?.message?.content || '';
+        httpsAgent,
+        timeout: 30000, // 30 секунд
+      }
+    );
+    return response.data.choices[0]?.message?.content || '';
   } catch (error) {
-    console.error('GigaChat error:', error);
+    console.error('GigaChat API error:', error.response?.data || error.message);
     throw error;
   }
 }
 
 async function regeneratePost(originalPrompt, userFeedback) {
-  const newPrompt = `Исходный запрос: "${originalPrompt}". Пожелание: "${userFeedback}". Сгенерируй улучшенный пост.`;
+  const newPrompt = `Исходный запрос: "${originalPrompt}". Пожелание пользователя: "${userFeedback}". Сгенерируй новый, улучшенный пост с учётом пожеланий.`;
   return generatePost(newPrompt);
 }
 
