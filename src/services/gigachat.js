@@ -10,28 +10,43 @@ async function getAccessToken() {
   if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
 
   const auth = Buffer.from(process.env.GIGACHAT_CREDENTIALS).toString('base64');
-  const response = await axios.post(
-    'https://ngw.devices.sberbank.ru:9443/api/v2/oauth',
-    'scope=' + (process.env.GIGACHAT_SCOPE || 'GIGACHAT_API_PERS'),
-    {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json',
-        'Authorization': `Basic ${auth}`,
-        'RqUID': '1'
-      },
-      httpsAgent,
-    }
-  );
+  console.log('🔑 Requesting token with auth (base64 start):', auth.substring(0, 30) + '...');
 
-  cachedToken = response.data.access_token;
-  tokenExpiry = Date.now() + (response.data.expires_at - Date.now()) - 60000;
-  return cachedToken;
+  try {
+    const response = await axios.post(
+      'https://ngw.devices.sberbank.ru:9443/api/v2/oauth',
+      'scope=' + (process.env.GIGACHAT_SCOPE || 'GIGACHAT_API_PERS'),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+          'Authorization': `Basic ${auth}`,
+          'RqUID': '1'
+        },
+        httpsAgent,
+        timeout: 30000
+      }
+    );
+    console.log('✅ Token response status:', response.status);
+    cachedToken = response.data.access_token;
+    tokenExpiry = Date.now() + (response.data.expires_at - Date.now()) - 60000;
+    return cachedToken;
+  } catch (error) {
+    console.error('❌ Error getting token:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      headers: error.response?.headers,
+    });
+    throw error;
+  }
 }
 
 async function generatePost(prompt) {
   try {
     const token = await getAccessToken();
+    console.log('📝 Sending prompt to GigaChat (start):', prompt.substring(0, 100) + '...');
+
     const response = await axios.post(
       'https://gigachat.devices.sberbank.ru/api/v1/chat/completions',
       {
@@ -50,12 +65,24 @@ async function generatePost(prompt) {
           'Content-Type': 'application/json',
         },
         httpsAgent,
-        timeout: 30000,
+        timeout: 60000, // увеличен таймаут до 60 секунд
       }
     );
+    console.log('✅ GigaChat response status:', response.status);
     return response.data.choices[0]?.message?.content || '';
   } catch (error) {
-    console.error('GigaChat API error:', error.response?.data || error.message);
+    console.error('❌ GigaChat API error (full):', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      headers: error.response?.headers,
+      config: {
+        url: error.config?.url,
+        method: error.config?.method,
+        data: error.config?.data ? JSON.parse(error.config.data) : null,
+        headers: error.config?.headers
+      }
+    });
     throw error;
   }
 }
