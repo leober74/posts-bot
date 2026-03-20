@@ -1469,6 +1469,16 @@ async function handleAdmin(ctx) {
   );
 }
 
+// 🔥 ТЕСТОВАЯ ОПЛАТА 1 РУБЛЬ (ТОЛЬКО ДЛЯ ЛЕОНИДА)
+bot.command('testpay', async (ctx) => {
+  if (parseInt(ctx.from.id) !== parseInt(process.env.ADMIN_CHAT_ID)) {
+    return ctx.reply('❌ Только для админа');
+  }
+  const { createTestPaymentLink } = require('../services/payment');
+  const link = await createTestPaymentLink(ctx.from.id);
+  ctx.reply(link ? `🧪 ТЕСТ 1₽: ${link}` : '❌ Ошибка ссылки');
+});
+
 module.exports = {
   handleStart, handleTypeChoice, handleTextInput,
   handleCallback, handleBalance, handleWithdraw, handleAdmin
