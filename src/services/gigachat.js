@@ -1,21 +1,21 @@
 // src/services/gigachat.js
 const axios = require('axios');
+const https = require('https');
 
 const {
   GIGACHAT_CLIENT_ID,
   GIGACHAT_CLIENT_SECRET,
   GIGACHAT_SCOPE,
-  GIGACHAT_MODEL,
-  GIGACHAT_API_PERS,
-  GIGACHAT_VERIFY_SSL_CERTS
+  GIGACHAT_MODEL
 } = process.env;
 
 let cachedToken = null;
 let tokenExpiresAt = 0;
 
+// Получение токена
 async function getAccessToken() {
   const now = Date.now();
-  if (cachedToken && now < tokenExpiresAt - 60_000) {
+  if (cachedToken && now < tokenExpiresAt - 60000) {
     return cachedToken;
   }
 
@@ -30,17 +30,19 @@ async function getAccessToken() {
         username: GIGACHAT_CLIENT_ID,
         password: GIGACHAT_CLIENT_SECRET
       },
-      httpsAgent: new (require('https').Agent)({
-        rejectUnauthorized: GIGACHAT_VERIFY_SSL_CERTS !== 'false'
+      httpsAgent: new https.Agent({
+        rejectUnauthorized: false
       })
     }
   );
 
   cachedToken = resp.data.access_token;
-  tokenExpiresAt = now + (resp.data.expires_at ? resp.data.expires_at * 1000 : 25 * 60 * 1000);
+  tokenExpiresAt = now + 25 * 60 * 1000;
+
   return cachedToken;
 }
 
+// Вызов GigaChat
 async function callGigaChat(prompt) {
   const token = await getAccessToken();
 
@@ -49,7 +51,7 @@ async function callGigaChat(prompt) {
     {
       model: GIGACHAT_MODEL || 'GigaChat',
       messages: [
-        { role: 'system', content: 'Ты помогаешь писать посты для соцсетей на русском языке.' },
+        { role: 'system', content: 'Ты пишешь посты для соцсетей на русском языке.' },
         { role: 'user', content: prompt }
       ]
     },
@@ -58,31 +60,28 @@ async function callGigaChat(prompt) {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      httpsAgent: new (require('https').Agent)({
-        rejectUnauthorized: GIGACHAT_VERIFY_SSL_CERTS !== 'false'
+      httpsAgent: new https.Agent({
+        rejectUnauthorized: false
       })
     }
   );
 
-  const choice = resp.data.choices?.[0];
-  return choice?.message?.content?.trim() || '';
+  return resp.data.choices?.[0]?.message?.content?.trim() || '';
 }
 
+// Генерация поста
 async function generatePost(prompt) {
-  console.log('generatePost: отправляю запрос в GigaChat');
-  const text = await callGigaChat(prompt);
-  if (!text) {
-    throw new Error('Пустой ответ GigaChat');
-  }
-  return text;
+  return await callGigaChat(prompt);
 }
 
-// если у тебя есть regeneratePost / synthesizeTopic — реализуй их аналогично
+// Перегенерация
 async function regeneratePost(type, userData, feedback, regenCount) {
-  const prompt = `Перегенерируй ${type} пост для соцсетей. 
-Учитывай данные о пользователе: ${JSON.stringify(userData, null, 2)}.
-Учитывай пожелания: "${feedback}".
-Это попытка №${regenCount}.`;
+  const prompt = `
+Перегенерируй ${type} пост.
+Данные пользователя: ${JSON.stringify(userData, null, 2)}
+Пожелания: "${feedback}"
+Попытка №${regenCount}
+  `;
   return await callGigaChat(prompt);
 }
 
