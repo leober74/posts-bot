@@ -1,11 +1,11 @@
 const { generatePost, regeneratePost } = require('../services/gigachat');
-const { User, Log, Generation, Payment } = require('../models/db');
-const { createPaymentLink, handlePaymentWebhook } = require('../services/payment');
+const { User, Log, Generation } = require('../models/db');
+const { createPaymentLink } = require('../services/payment');
 const keyboards = require('../utils/keyboards');
 const ru = require('../locales/ru.json');
 const en = require('../locales/en.json');
 
-// Хранилище сессий (в памяти)
+// Временное хранилище сессий (в памяти)
 const sessions = new Map();
 
 function getLocale(langCode) {
@@ -13,9 +13,6 @@ function getLocale(langCode) {
   return en;
 }
 
-// --------------------------------------------------------------
-// Вспомогательная функция для отправки локализованного сообщения
-// --------------------------------------------------------------
 async function sendLocalized(ctx, key, options = {}) {
   const t = getLocale(ctx.from.language_code || 'en');
   const text = t[key];
@@ -42,7 +39,7 @@ async function handleText(ctx) {
   }
   session.lang = lang;
 
-  // -------------------- ВОВЛЕЧЕНИЕ (калькулятор + история) --------------------
+  // -------------------- ВОВЛЕЧЕНИЕ --------------------
   if (session.step === 'start') {
     await sendLocalized(ctx, 'welcome');
     await sendLocalized(ctx, 'ask_hours');
@@ -86,7 +83,6 @@ async function handleText(ctx) {
   }
 
   if (session.step === 'awaiting_blocker') {
-    // Сохраняем причину в лог
     await Log.create({ telegram_id: userId, event: 'blocker', details: { text: ctx.message.text } });
     await sendLocalized(ctx, 'blocker_thanks');
     session.step = 'registration';
@@ -103,17 +99,11 @@ async function handleText(ctx) {
   }
 
   if (session.step === 'awaiting_gender') {
-    // обрабатывается в callback
+    // handled in callback
   }
 
   if (session.step === 'awaiting_interests') {
-    // обработка интересов (множественный выбор) – предполагается, что вы уже умеете это делать
-    // в вашем коде, просто сохраните выбранные интересы в session.data.interests
-    // и после нажатия "Готово" переходите к выбору темы
-    // Пример:
-    // session.data.interests = [ ... ];
-    // session.step = 'awaiting_topic';
-    // await sendLocalized(ctx, 'topic_prompt', { reply_markup: keyboards.topics() });
+    // handled in callback (multiple choice)
   }
 
   if (session.step === 'awaiting_topic') {
@@ -177,39 +167,96 @@ async function handleText(ctx) {
 
   if (session.step === 'awaiting_profile_link') {
     session.data.profile_link = ctx.message.text;
-    // валидация не обязательна, можно пропустить
     await generatePosts(ctx, session);
     return;
   }
 
-  // -------------------- БИЗНЕС-ВЕТКА (упрощённо) --------------------
-  if (session.step === 'awaiting_business_desc') {
-    session.data.business_desc = ctx.message.text;
-    await sendLocalized(ctx, 'business_frequency', { reply_markup: keyboards.businessFreq() });
+  // -------------------- БИЗНЕС-ВЕТКА (LTV-опрос) --------------------
+  if (session.step === 'awaiting_business_product') {
+    session.data.business_product = ctx.message.text;
+    await sendLocalized(ctx, 'business_frequency_question', {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: t.business_frequency_one, callback_data: 'freq_one' },
+            { text: t.business_frequency_several, callback_data: 'freq_several' },
+            { text: t.business_frequency_monthly, callback_data: 'freq_monthly' }
+          ],
+          [
+            { text: t.business_frequency_quarterly, callback_data: 'freq_quarterly' },
+            { text: t.business_frequency_subscription, callback_data: 'freq_subscription' }
+          ]
+        ]
+      }
+    });
     session.step = 'awaiting_business_freq';
     return;
   }
 
-  if (session.step === 'awaiting_business_freq') {
-    session.data.business_freq = ctx.message.text;
-    // после этого можно сразу генерировать посты для бизнеса
+  if (session.step === 'awaiting_business_avg_check') {
+    const avgCheck = parseFloat(ctx.message.text);
+    if (isNaN(avgCheck)) {
+      await ctx.reply('Пожалуйста, введите число.');
+      return;
+    }
+    session.data.business_avg_check = avgCheck;
+    await sendLocalized(ctx, 'business_loyalty', {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: t.business_loyalty_yes, callback_data: 'loyalty_yes' },
+            { text: t.business_loyalty_no, callback_data: 'loyalty_no' },
+            { text: t.business_loyalty_planned, callback_data: 'loyalty_planned' }
+          ]
+        ]
+      }
+    });
+    session.step = 'awaiting_business_loyalty';
+    return;
+  }
+
+  if (session.step === 'awaiting_business_ltv_months') {
+    const ltvMonths = parseFloat(ctx.message.text);
+    if (isNaN(ltvMonths)) {
+      await ctx.reply('Пожалуйста, введите число.');
+      return;
+    }
+    session.data.business_ltv_months = ltvMonths;
+    // Сохраняем бизнес-данные в БД (предполагаем поле business_data)
+    try {
+      await User.update(
+        {
+          business_data: {
+            description: session.data.business_desc,
+            product: session.data.business_product,
+            frequency: session.data.business_freq,
+            avg_check: session.data.business_avg_check,
+            loyalty: session.data.business_loyalty,
+            ltv_months: session.data.business_ltv_months
+          }
+        },
+        { where: { telegram_id: ctx.from.id } }
+      );
+    } catch (err) {
+      console.error('Ошибка сохранения бизнес-данных:', err);
+    }
+    await sendLocalized(ctx, 'business_thanks');
     await generatePosts(ctx, session);
     return;
   }
 }
 
 // --------------------------------------------------------------
-// Обработчик callback-запросов (кнопки)
+// Обработчик callback-запросов
 // --------------------------------------------------------------
 async function handleCallback(ctx) {
   const userId = ctx.from.id;
   const session = sessions.get(userId);
   if (!session) return;
   const t = getLocale(session.lang);
-
   const data = ctx.callbackQuery.data;
 
-  // --- обработка кнопок истории ---
+  // Кнопки истории
   if (session.step === 'awaiting_story') {
     if (data === 'story_yes') {
       await ctx.editMessageText(t.ask_blocker);
@@ -223,7 +270,7 @@ async function handleCallback(ctx) {
     return;
   }
 
-  // --- возраст ---
+  // Возраст
   if (session.step === 'awaiting_age') {
     session.data.age = data;
     await ctx.editMessageText(t.gender_prompt, { reply_markup: keyboards.gender() });
@@ -232,7 +279,7 @@ async function handleCallback(ctx) {
     return;
   }
 
-  // --- пол ---
+  // Пол
   if (session.step === 'awaiting_gender') {
     session.data.gender = data;
     await ctx.editMessageText(t.user_type_prompt, { reply_markup: keyboards.userType() });
@@ -241,64 +288,41 @@ async function handleCallback(ctx) {
     return;
   }
 
-  // --- тип пользователя ---
+  // Тип пользователя
   if (session.step === 'awaiting_user_type') {
     session.data.user_type = data;
     if (data === 'personal') {
       await ctx.editMessageText(t.personal_interests_prompt, { reply_markup: keyboards.interests() });
       session.step = 'awaiting_interests';
     } else {
-      await ctx.editMessageText(t.business_intro);
-      session.step = 'awaiting_business_desc';
+      // Бизнес-ветка: LTV-опрос
+      await ctx.editMessageText(t.business_calc_prompt);
+      await sendLocalized(ctx, 'business_product_question');
+      session.step = 'awaiting_business_product';
     }
     await ctx.answerCbQuery();
     return;
   }
 
-  // --- интересы (мультивыбор) – здесь нужна ваша логика, у меня пример ---
-  if (session.step === 'awaiting_interests') {
-    // если data начинается с 'interest_', то добавляем/удаляем
-    // в конце – кнопка "Готово"
-    if (data === 'interests_done') {
-      // сохраняем выбранные интересы (session.data.interests) и переходим к теме
-      await ctx.editMessageText(t.topic_prompt, { reply_markup: keyboards.topics() });
-      session.step = 'awaiting_topic';
-    } else {
-      // переключаем интерес (сохраняем в сессии)
-      //...
-    }
+  // Частота покупок (бизнес)
+  if (session.step === 'awaiting_business_freq') {
+    session.data.business_freq = data;
+    await ctx.editMessageText(t.business_avg_check);
+    session.step = 'awaiting_business_avg_check';
     await ctx.answerCbQuery();
     return;
   }
 
-  // --- тема ---
-  if (session.step === 'awaiting_topic') {
-    session.data.topic = data;
-    await ctx.editMessageText(t.social_prompt, { reply_markup: keyboards.socials() });
-    session.step = 'awaiting_social';
+  // Программа лояльности (бизнес)
+  if (session.step === 'awaiting_business_loyalty') {
+    session.data.business_loyalty = data;
+    await ctx.editMessageText(t.business_ltv_months);
+    session.step = 'awaiting_business_ltv_months';
     await ctx.answerCbQuery();
     return;
   }
 
-  // --- соцсеть ---
-  if (session.step === 'awaiting_social') {
-    session.data.social = data;
-    await ctx.editMessageText(t.style_prompt);
-    session.step = 'awaiting_style_examples';
-    await ctx.answerCbQuery();
-    return;
-  }
-
-  // --- стиль (если выбрал из кнопок) ---
-  if (session.step === 'awaiting_style_choice') {
-    session.data.style = data;
-    await ctx.editMessageText(t.keywords_prompt, { reply_markup: { inline_keyboard: [[{ text: '⏭ Пропустить всё', callback_data: 'skip_keywords' }]] } });
-    session.step = 'awaiting_keywords_selling';
-    await ctx.answerCbQuery();
-    return;
-  }
-
-  // --- пропуск ключевых слов ---
+  // Пропуск ключевых слов
   if (data === 'skip_keywords') {
     await ctx.editMessageText(t.profile_link_prompt);
     session.step = 'awaiting_profile_link';
@@ -306,19 +330,17 @@ async function handleCallback(ctx) {
     return;
   }
 
-  // --- оценка поста (1-5) ---
+  // Оценка поста
   if (data.startsWith('rate_')) {
     const rate = parseInt(data.split('_')[1]);
     const postIndex = session.data.currentPostIndex || 0;
     const post = session.data.posts[postIndex];
     if (post) {
-      // сохраняем оценку в БД (можно в Generation)
+      // Сохраняем оценку (можно в БД)
       if (rate <= 3) {
-        // запрашиваем фидбек
         await ctx.editMessageText(t.feedback_prompt);
         session.step = `awaiting_feedback_${postIndex}`;
       } else {
-        // хорошая оценка, показываем инструкцию и переходим к следующему
         await showPostInstructions(ctx, session, postIndex);
         if (postIndex + 1 < session.data.posts.length) {
           session.data.currentPostIndex = postIndex + 1;
@@ -332,7 +354,7 @@ async function handleCallback(ctx) {
     return;
   }
 
-  // --- следующий пост (если оценка была 4-5 и пользователь нажал кнопку) ---
+  // Следующий пост
   if (data === 'next_post') {
     const postIndex = session.data.currentPostIndex + 1;
     if (postIndex < session.data.posts.length) {
@@ -345,16 +367,21 @@ async function handleCallback(ctx) {
     return;
   }
 
-  // --- кнопки подписки, вопрос, связаться ---
+  // Подписка
   if (data === 'subscribe') {
-    // создаём платёж через Точку или Stripe в зависимости от страны
-    const paymentLink = await createPaymentLink(userId, 100, session.lang);
-    await ctx.editMessageText(t.subscribe_link.replace('{link}', paymentLink));
-    session.step = 'waiting_payment';
+    const isRussian = session.lang === 'ru';
+    if (isRussian) {
+      const paymentLink = await createPaymentLink(userId, 100);
+      await ctx.editMessageText(t.subscribe_link.replace('{link}', paymentLink));
+    } else {
+      // Для иностранцев пока заглушка
+      await ctx.editMessageText('Payment will be available soon. Stay tuned!');
+    }
     await ctx.answerCbQuery();
     return;
   }
 
+  // Кнопки поддержки и вопросов
   if (data === 'contact_expert') {
     await ctx.editMessageText(t.contact_expert);
     session.step = 'awaiting_contact';
@@ -368,6 +395,59 @@ async function handleCallback(ctx) {
     await ctx.answerCbQuery();
     return;
   }
+
+  // --- Кнопка курса OneShop ---
+  if (data === 'oneshop_course') {
+    await ctx.editMessageText(t.oneshop_course_info, { parse_mode: 'Markdown' });
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: '✅ Я прошёл курс', callback_data: 'oneshop_course_done' }],
+        [{ text: '🔙 Назад', callback_data: 'back_to_final' }]
+      ]
+    };
+    await ctx.reply(t.oneshop_course_already_done, { reply_markup: keyboard });
+    session.step = 'awaiting_course_screenshot';
+    await ctx.answerCbQuery();
+    return;
+  }
+
+  if (data === 'oneshop_course_done') {
+    await ctx.editMessageText(t.oneshop_course_already_done);
+    session.step = 'awaiting_course_screenshot';
+    await ctx.answerCbQuery();
+    return;
+  }
+
+  if (data === 'back_to_final') {
+    await finishGeneration(ctx, session);
+    await ctx.answerCbQuery();
+    return;
+  }
+}
+
+// --------------------------------------------------------------
+// Обработчик фото (скриншот курса)
+// --------------------------------------------------------------
+async function handlePhoto(ctx) {
+  const userId = ctx.from.id;
+  const session = sessions.get(userId);
+  if (!session) return;
+  const t = getLocale(session.lang);
+
+  if (session.step === 'awaiting_course_screenshot') {
+    const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+    // В реальном проекте можно отправить файл на проверку (например, через AI), 
+    // но для MVP достаточно просто отметить, что пользователь отправил фото.
+    await User.update(
+      { oneshop_course_completed: true },
+      { where: { telegram_id: userId } }
+    );
+    await ctx.reply(t.oneshop_course_confirm);
+    session.step = 'idle';
+    // Возвращаем финальное меню
+    await finishGeneration(ctx, session);
+    return;
+  }
 }
 
 // --------------------------------------------------------------
@@ -377,8 +457,10 @@ async function generatePosts(ctx, session) {
   const t = getLocale(session.lang);
   await ctx.reply(t.generating);
 
+  // Здесь должен быть реальный вызов AI. Вместо заглушки используйте свой код.
+  // В качестве примера:
   const prompts = {
-    selling: `Напиши продающий пост для соцсети ${session.data.social} на тему ${session.data.topic}. Аудитория: ${session.data.age}, ${session.data.gender}. Стиль: ${session.data.style || 'дружелюбный'}. Ключевые слова: ${session.data.keywords_selling || ''}. Используй структуру AIDA. Длина: до 1000 знаков.`,
+    selling: `Напиши продающий пост для соцсети ${session.data.social} на тему ${session.data.topic}. Аудитория: ${session.data.age}, ${session.data.gender}. Стиль: ${session.data.style || 'дружелюбный'}. Ключевые слова: ${session.data.keywords_selling || ''}. Используй структуру AIDA.`,
     entertaining: `Напиши развлекательный пост...`,
     expert: `Напиши экспертный пост...`,
     engaging: `Напиши вовлекающий пост...`
@@ -417,14 +499,11 @@ async function showPost(ctx, session, index) {
 
 async function showPostInstructions(ctx, session, index) {
   const t = getLocale(session.lang);
-  const post = session.data.posts[index];
-  // здесь можно показать инструкцию по публикации для выбранной соцсети
   await ctx.reply(t.publish_instructions);
 }
 
 async function finishGeneration(ctx, session) {
   const t = getLocale(session.lang);
-  // финальный экран с кнопками подписки, реферальной ссылкой
   const keyboard = {
     inline_keyboard: [
       [{ text: t.subscription_button, callback_data: 'subscribe' }],
@@ -433,11 +512,23 @@ async function finishGeneration(ctx, session) {
     ]
   };
   await ctx.reply(t.final_message, { reply_markup: keyboard });
-  // также показываем реферальную ссылку
+
   const user = await User.findOne({ where: { telegram_id: ctx.from.id } });
   if (user) {
     await ctx.reply(t.referral_message.replace('{link}', `https://t.me/${ctx.botInfo.username}?start=ref_${user.referral_code}`));
   }
+
+  // Проверяем, не прошёл ли пользователь уже курс OneShop
+  const userData = await User.findOne({ where: { telegram_id: ctx.from.id } });
+  if (!userData?.oneshop_course_completed) {
+    const courseKeyboard = {
+      inline_keyboard: [
+        [{ text: t.oneshop_course_button, callback_data: 'oneshop_course' }]
+      ]
+    };
+    await ctx.reply(t.oneshop_course_offer, { reply_markup: courseKeyboard });
+  }
+
   session.step = 'idle';
 }
 
@@ -451,10 +542,11 @@ async function startRegistration(ctx, session) {
 }
 
 // --------------------------------------------------------------
-// Экспорт для index.js
+// Экспорт
 // --------------------------------------------------------------
 module.exports = {
   handleText,
   handleCallback,
+  handlePhoto,
   startRegistration
 };
